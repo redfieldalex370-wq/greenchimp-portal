@@ -8,7 +8,7 @@
     "apps/api"
   ],
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=22.14.0"
   },
   "scripts": {
     "dev": "concurrently -n API,WEB -c auto \"npm run dev --workspace @greenchimp/api\" \"npm run dev --workspace @greenchimp/web\"",
