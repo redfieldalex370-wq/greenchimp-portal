@@ -166,7 +166,9 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async 
 });
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const webDist = path.resolve(currentDir, '../../web/dist');
+const bundledWebDist = path.resolve(currentDir, 'web');
+const workspaceWebDist = path.resolve(currentDir, '../../web/dist');
+const webDist = fs.existsSync(bundledWebDist) ? bundledWebDist : workspaceWebDist;
 if (config.NODE_ENV === 'production' && fs.existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get('/', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));

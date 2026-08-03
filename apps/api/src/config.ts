@@ -4,7 +4,10 @@ import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.resolve(currentDir, '../../../.env'), override: true });
+const workspaceEnv = path.resolve(currentDir, '../../../.env');
+const bundledEnv = path.resolve(currentDir, '../.env');
+loadEnv({ path: workspaceEnv, override: true });
+loadEnv({ path: bundledEnv, override: true });
 
 // La configuracion se recarga al reiniciar el proceso del API.
 
