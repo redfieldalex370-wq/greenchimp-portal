@@ -14,7 +14,7 @@ import {
   markRead,
   setBotActive
 } from './repository.js';
-import { markReadViaN8n, sendManualMessage, updateBotViaN8n } from './n8n.js';
+import { sendManualMessage } from './n8n.js';
 
 const app = express();
 const conversationParamsSchema = z.object({
@@ -157,11 +157,7 @@ app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) =>
 app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
-    if (!config.DEMO_MODE && config.N8N_READ_URL) {
-      await markReadViaN8n(params.phoneNumberId, params.waId);
-    } else {
-      await markRead(params.phoneNumberId, params.waId);
-    }
+    await markRead(params.phoneNumberId, params.waId);
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -174,16 +170,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, async (req,
     const input = z.object({ active: z.boolean() }).parse(req.body);
     const actor = res.locals.user.name as string;
 
-    if (!config.DEMO_MODE && config.N8N_BOT_URL) {
-      await updateBotViaN8n({
-        phoneNumberId: params.phoneNumberId,
-        waId: params.waId,
-        active: input.active,
-        actor
-      });
-    } else {
-      await setBotActive(params.phoneNumberId, params.waId, input.active, actor);
-    }
+    await setBotActive(params.phoneNumberId, params.waId, input.active, actor);
 
     res.json({ ok: true });
   } catch (error) {
