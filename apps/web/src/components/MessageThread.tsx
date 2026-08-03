@@ -16,7 +16,7 @@ function MediaContent({ message }: { message: Message }) {
   const type = message.tipo.toLowerCase();
 
   if (type === 'image' || type === 'sticker') {
-    return <img className="message-media message-media--image" src={url} alt={message.texto || 'Imagen de WhatsApp'} loading="lazy" />;
+    return <img className={`message-media message-media--${type}`} src={url} alt={message.texto || (type === 'sticker' ? 'Sticker de WhatsApp' : 'Imagen de WhatsApp')} loading="lazy" />;
   }
   if (type === 'audio' || type === 'voice') {
     return <audio className="message-media message-media--audio" src={url} controls preload="metadata" />;
@@ -90,13 +90,16 @@ export function MessageThread({
       </header>
 
       <div className="message-scroll">
-        {messages.map((message) => (
+        {messages.map((message) => {
+          const mediaType = message.tipo.toLowerCase();
+          const showMediaLabel = !['image', 'sticker', 'audio', 'voice', 'video'].includes(mediaType);
+          return (
           <article
             key={message.id || message.message_id}
             className={`message-row ${message.direccion === 'out' ? 'message-row--out' : ''}`}
           >
-            <div className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''}`}>
-              {message.tipo !== 'text' && <span className="media-label">{message.tipo.toUpperCase()}</span>}
+            <div className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''} ${message.tipo !== 'text' ? `message-bubble--${mediaType}` : ''}`}>
+              {showMediaLabel && <span className="media-label">{message.tipo.toUpperCase()}</span>}
               {message.tipo === 'text' ? <p>{message.texto}</p> : <MediaContent message={message} />}
               {message.tipo !== 'text' && message.texto && <p className="media-caption">{message.texto}</p>}
               <footer>
@@ -106,7 +109,8 @@ export function MessageThread({
               </footer>
             </div>
           </article>
-        ))}
+          );
+        })}
         {!loading && messages.length === 0 && <div className="empty-thread">Todavía no hay mensajes guardados.</div>}
         <div ref={bottomRef} />
       </div>
