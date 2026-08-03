@@ -32,6 +32,8 @@ const schema = z.object({
   N8N_BOT_URL: z.string().url().optional().or(z.literal('')),
   N8N_READ_URL: z.string().url().optional().or(z.literal('')),
   N8N_PORTAL_KEY: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_GRAPH_VERSION: z.string().default('v23.0'),
   DEFAULT_PHONE_NUMBER_ID: z.string().default('1240006745865858')
 });
 

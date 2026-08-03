@@ -9,6 +9,25 @@ function StatusMark({ status }: { status: string }) {
   return <span className="status-mark">✓</span>;
 }
 
+function MediaContent({ message }: { message: Message }) {
+  if (!message.media_id || !message.id) return <p>{message.texto || 'Contenido multimedia no disponible'}</p>;
+
+  const url = `/api/messages/${encodeURIComponent(message.id)}/media`;
+  const type = message.tipo.toLowerCase();
+
+  if (type === 'image' || type === 'sticker') {
+    return <img className="message-media message-media--image" src={url} alt={message.texto || 'Imagen de WhatsApp'} loading="lazy" />;
+  }
+  if (type === 'audio' || type === 'voice') {
+    return <audio className="message-media message-media--audio" src={url} controls preload="metadata" />;
+  }
+  if (type === 'video') {
+    return <video className="message-media message-media--video" src={url} controls preload="metadata" />;
+  }
+
+  return <a className="media-download" href={url} target="_blank" rel="noreferrer">Abrir o descargar archivo</a>;
+}
+
 export function MessageThread({
   conversation,
   messages,
@@ -78,7 +97,8 @@ export function MessageThread({
           >
             <div className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''}`}>
               {message.tipo !== 'text' && <span className="media-label">{message.tipo.toUpperCase()}</span>}
-              <p>{message.texto || 'Contenido multimedia'}</p>
+              {message.tipo === 'text' ? <p>{message.texto}</p> : <MediaContent message={message} />}
+              {message.tipo !== 'text' && message.texto && <p className="media-caption">{message.texto}</p>}
               <footer>
                 {message.direccion === 'out' && <span>{message.autor}</span>}
                 <time>{clockTime(message.creado_en)}</time>

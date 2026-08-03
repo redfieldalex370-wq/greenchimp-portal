@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
 import {
   addDemoOutgoingMessage,
+  getMessageMedia,
   listConversations,
   listMessages,
   markRead,
@@ -94,6 +95,58 @@ app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (
       ok: true,
       messages: await listMessages(params.phoneNumberId, params.waId)
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) => {
+  try {
+    const { messageId } = z.object({ messageId: z.string().uuid() }).parse(req.params);
+    const media = await getMessageMedia(messageId);
+    if (!media?.media_id) {
+      res.status(404).json({ ok: false, error: 'Archivo multimedia no encontrado.' });
+      return;
+    }
+    if (!config.WHATSAPP_ACCESS_TOKEN) {
+      res.status(503).json({ ok: false, error: 'Falta configurar WHATSAPP_ACCESS_TOKEN.' });
+      return;
+    }
+
+    const authorization = `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`;
+    const metadataResponse = await fetch(
+      `https://graph.facebook.com/${config.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(media.media_id)}`,
+      { headers: { authorization } }
+    );
+    if (!metadataResponse.ok) {
+      throw Object.assign(new Error('Meta no pudo resolver el archivo multimedia.'), {
+        status: metadataResponse.status === 404 ? 404 : 502
+      });
+    }
+
+    const metadata = z.object({
+      url: z.string().url(),
+      mime_type: z.string().optional(),
+      file_size: z.coerce.number().optional()
+    }).parse(await metadataResponse.json());
+
+    const fileResponse = await fetch(metadata.url, { headers: { authorization } });
+    if (!fileResponse.ok || !fileResponse.body) {
+      throw Object.assign(new Error('Meta no pudo descargar el archivo multimedia.'), { status: 502 });
+    }
+
+    res.setHeader('Content-Type', metadata.mime_type || fileResponse.headers.get('content-type') || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Content-Disposition', `inline; filename="whatsapp-${messageId}"`);
+    if (metadata.file_size) res.setHeader('Content-Length', String(metadata.file_size));
+
+    const reader = fileResponse.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+    res.end();
   } catch (error) {
     next(error);
   }

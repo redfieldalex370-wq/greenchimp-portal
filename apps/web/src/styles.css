@@ -83,6 +83,11 @@ button { color: inherit; }
 .message-bubble footer { margin-top: 6px; display: flex; justify-content: flex-end; gap: 5px; font-size: 9px; color: #768178; }
 .message-bubble--out footer { color: #63704f; }
 .media-label { display: inline-block; font-size: 8px; font-weight: 900; letter-spacing: .1em; margin-bottom: 5px; opacity: .72; }
+.message-media { display: block; margin: 2px 0 7px; max-width: min(420px, 100%); }
+.message-media--image, .message-media--video { border-radius: 10px; max-height: 420px; object-fit: contain; }
+.message-media--audio { min-width: min(300px, 100%); width: 100%; }
+.media-download { color: inherit; display: inline-flex; font-weight: 800; padding: 10px 12px; text-decoration: underline; }
+.media-caption { margin-top: 6px; }
 .status-mark { font-weight: 900; letter-spacing: -2px; }
 .status-mark--read { color: #2381cf; }
 .status-mark--error { color: var(--danger); letter-spacing: 0; }

@@ -51,6 +51,15 @@ npm run seed:admin
 
 5. Configura los tres webhooks de n8n y el secreto compartido en `.env`.
 
+Para visualizar archivos multimedia recibidos, configura exclusivamente en el backend:
+
+```env
+WHATSAPP_ACCESS_TOKEN=token-permanente-de-whatsapp
+WHATSAPP_GRAPH_VERSION=v23.0
+```
+
+El navegador solicita el archivo a la API autenticada; el token de Meta nunca se entrega al frontend.
+
 ## Endpoints del backend
 
 | Método | Ruta | Función |
@@ -60,6 +69,7 @@ npm run seed:admin
 | `GET` | `/api/auth/me` | Usuario actual |
 | `GET` | `/api/conversations` | Lista desde `wa_bandeja` |
 | `GET` | `/api/conversations/:phoneNumberId/:waId/messages` | Hilo completo |
+| `GET` | `/api/messages/:messageId/media` | Descarga multimedia desde Meta |
 | `POST` | `/api/conversations/:phoneNumberId/:waId/messages` | Envía por n8n |
 | `POST` | `/api/conversations/:phoneNumberId/:waId/bot` | Pausa o reactiva |
 | `POST` | `/api/conversations/:phoneNumberId/:waId/read` | Marca como leído |

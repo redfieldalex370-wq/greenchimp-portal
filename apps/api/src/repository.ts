@@ -57,6 +57,25 @@ export async function listMessages(phoneNumberId: string, waId: string): Promise
   );
 }
 
+export async function getMessageMedia(messageId: string): Promise<Pick<Message, 'media_id' | 'tipo'> | null> {
+  if (config.DEMO_MODE) {
+    for (const messages of demoMessages.values()) {
+      const message = messages.find((item) => item.id === messageId);
+      if (message?.media_id) return { media_id: message.media_id, tipo: message.tipo };
+    }
+    return null;
+  }
+
+  const rows = await query<Pick<Message, 'media_id' | 'tipo'>>(
+    `SELECT media_id, tipo
+       FROM public.wa_mensajes
+      WHERE id::text = $1 AND media_id IS NOT NULL
+      LIMIT 1`,
+    [messageId]
+  );
+  return rows[0] ?? null;
+}
+
 export async function markRead(phoneNumberId: string, waId: string) {
   if (config.DEMO_MODE) {
     updateDemoConversation(phoneNumberId, waId, (item) => ({ ...item, no_leidos: 0 }));
