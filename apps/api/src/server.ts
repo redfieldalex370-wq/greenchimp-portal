@@ -102,7 +102,9 @@ app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (
 
 app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) => {
   try {
-    const { messageId } = z.object({ messageId: z.string().uuid() }).parse(req.params);
+    const { messageId } = z.object({
+      messageId: z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/)
+    }).parse(req.params);
     const media = await getMessageMedia(messageId);
     if (!media?.media_id) {
       res.status(404).json({ ok: false, error: 'Archivo multimedia no encontrado.' });
