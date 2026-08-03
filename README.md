@@ -10,6 +10,8 @@ Starter full-stack para la bandeja interna de WhatsApp Cloud API de Green Chimp.
 
 El navegador nunca recibe la contraseña de PostgreSQL, el token permanente de WhatsApp ni `X-Portal-Key`.
 
+Para una verificación inicial se puede omitir temporalmente el login con `AUTH_DISABLED=true`. Debe volver a `false` al terminar, porque deja la bandeja accesible para cualquiera que conozca la URL.
+
 ## Inicio rápido en modo demostración
 
 Requisitos: Node.js 22.18 o superior y npm.

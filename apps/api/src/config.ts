@@ -23,6 +23,7 @@ const schema = z.object({
   COOKIE_NAME: z.string().default('gc_portal_session'),
   COOKIE_SECURE: booleanFromString,
   SESSION_DAYS: z.coerce.number().int().positive().default(30),
+  AUTH_DISABLED: booleanFromString,
   DEMO_MODE: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   DEMO_ADMIN_USER: z.string().default('admin'),
   DEMO_ADMIN_PASSWORD: z.string().default('cambia-esta-clave'),

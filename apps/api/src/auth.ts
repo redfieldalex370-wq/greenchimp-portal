@@ -90,6 +90,15 @@ export async function destroySession(req: Request, res: Response) {
 }
 
 export async function getSessionUser(req: Request): Promise<PortalUser | null> {
+  if (config.AUTH_DISABLED) {
+    return {
+      id: 'temporary-access',
+      username: 'admin-temporal',
+      name: 'Administrador Green Chimp',
+      email: null
+    };
+  }
+
   const token = parseCookies(req.headers.cookie)[config.COOKIE_NAME];
   if (!token) return null;
 
