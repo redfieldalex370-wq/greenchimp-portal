@@ -92,14 +92,12 @@ export function MessageThread({
       <div className="message-scroll">
         {messages.map((message) => {
           const mediaType = message.tipo.toLowerCase();
-          const showMediaLabel = !['image', 'sticker', 'audio', 'voice', 'video'].includes(mediaType);
           return (
           <article
             key={message.id || message.message_id}
             className={`message-row ${message.direccion === 'out' ? 'message-row--out' : ''}`}
           >
             <div className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''} ${message.tipo !== 'text' ? `message-bubble--${mediaType}` : ''}`}>
-              {showMediaLabel && <span className="media-label">{message.tipo.toUpperCase()}</span>}
               {message.tipo === 'text' ? <p>{message.texto}</p> : <MediaContent message={message} />}
               {message.tipo !== 'text' && message.texto && <p className="media-caption">{message.texto}</p>}
               <footer>
