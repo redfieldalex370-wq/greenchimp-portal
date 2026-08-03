@@ -1,0 +1,23 @@
+{
+  "name": "greenchimp-portal-conversaciones",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c auto \"npm run dev --workspace @greenchimp/api\" \"npm run dev --workspace @greenchimp/web\"",
+    "build": "npm run build --workspace @greenchimp/api && npm run build --workspace @greenchimp/web",
+    "typecheck": "npm run typecheck --workspace @greenchimp/api && npm run typecheck --workspace @greenchimp/web",
+    "start": "npm run start --workspace @greenchimp/api",
+    "seed:admin": "npm run seed:admin --workspace @greenchimp/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

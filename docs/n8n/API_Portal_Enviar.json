@@ -1,0 +1,193 @@
+{
+  "name": "API Portal Conversaciones - Enviar",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "portal/enviar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-880, 0],
+      "id": "f2ee1095-3da5-4a3c-9252-ffcf8c6a9541",
+      "name": "POST portal enviar",
+      "webhookId": "2db4d91e-37df-4dcd-82b1-portal-enviar"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nconst body = input.body || input;\nconst headers = input.headers || {};\nconst configuredSecret = String($env.N8N_PORTAL_KEY || '').trim();\nconst receivedSecret = String(headers['x-portal-key'] || headers['X-Portal-Key'] || '').trim();\n\nif (!configuredSecret) {\n  return [{ json: { ok:false, authorized:false, statusCode:500, error:'N8N_PORTAL_KEY no esta configurada en n8n.' } }];\n}\nif (!receivedSecret || receivedSecret !== configuredSecret) {\n  return [{ json: { ok:false, authorized:false, statusCode:401, error:'No autorizado.' } }];\n}\n\nconst phone_number_id = String(body.phone_number_id || '').trim();\nconst wa_id = String(body.wa_id || '').trim();\nconst texto = String(body.texto || '').trim();\nconst usuario = String(body.usuario || '').trim();\n\nif (!phone_number_id || !wa_id || !texto || !usuario || texto.length > 4096) {\n  return [{ json: { ok:false, authorized:false, statusCode:400, error:'Solicitud invalida.' } }];\n}\n\nreturn [{ json: { ok:true, authorized:true, statusCode:200, phone_number_id, wa_id, texto, usuario } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-656, 0],
+      "id": "4cc37587-d218-40cb-a29a-8ea1fc10df64",
+      "name": "Validar clave y solicitud"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "authorization-ok",
+              "leftValue": "={{ $json.authorized }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-432, 0],
+      "id": "ca63ef48-a737-4625-a9ce-4c578924bb9d",
+      "name": "IF solicitud valida"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error:$json.error }) }}",
+        "options": { "responseCode": "={{ $json.statusCode }}" }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-208, 176],
+      "id": "a39d96f4-a1d8-4fe2-8644-27e46a446ba2",
+      "name": "Responder error solicitud"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  EXISTS (\n    SELECT 1 FROM public.wa_bandeja\n    WHERE phone_number_id = $1 AND wa_id = $2 AND archivada = false\n  ) AS conversacion_existe,\n  COALESCE((\n    SELECT ventana_abierta FROM public.wa_bandeja\n    WHERE phone_number_id = $1 AND wa_id = $2 AND archivada = false\n    LIMIT 1\n  ), false) AS ventana_abierta;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validar clave y solicitud').item.json.phone_number_id, $('Validar clave y solicitud').item.json.wa_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [-208, -64],
+      "id": "5c201b55-9f98-46ae-8ad3-16ab00702df0",
+      "name": "Verificar conversacion y ventana",
+      "credentials": {
+        "postgres": { "id": "Cpk8ls3nVc2hXeAN", "name": "SUPABASE" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "window-open",
+              "leftValue": "={{ $json.ventana_abierta }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [16, -64],
+      "id": "676847cd-e9a5-440c-8fee-15932f14be08",
+      "name": "IF ventana abierta"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, motivo: $json.conversacion_existe ? 'ventana_cerrada' : 'conversacion_no_encontrada' }) }}",
+        "options": { "responseCode": "={{ $json.conversacion_existe ? 409 : 404 }}" }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [240, 80],
+      "id": "c4779440-a783-4212-a22f-7e67bab7756d",
+      "name": "Responder ventana cerrada"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v26.0/{{ $('Validar clave y solicitud').item.json.phone_number_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product:'whatsapp', recipient_type:'individual', to:$('Validar clave y solicitud').item.json.wa_id, type:'text', text:{ preview_url:false, body:$('Validar clave y solicitud').item.json.texto } }) }}",
+        "options": { "timeout": 20000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [240, -144],
+      "id": "c5b7d915-703f-4648-b7bc-13dc7dfecdaa",
+      "name": "Enviar mensaje WhatsApp",
+      "credentials": {
+        "httpHeaderAuth": { "id": "tpIpVcEFUnS0o95n", "name": "WhatsApp Cloud API - Green Chimp LT" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH datos AS (\n  SELECT\n    $1::text AS phone_number_id,\n    $2::text AS wa_id,\n    $3::text AS texto,\n    $4::text AS usuario,\n    $5::text AS message_id\n), mensaje AS (\n  INSERT INTO public.wa_mensajes\n    (phone_number_id, wa_id, direccion, autor, tipo, texto, message_id, estado)\n  SELECT phone_number_id, wa_id, 'out', usuario, 'text', texto, message_id, 'accepted'\n  FROM datos\n  ON CONFLICT (message_id) DO NOTHING\n), conversacion AS (\n  UPDATE public.wa_conversaciones c SET\n    bot_activo = false,\n    pausado_en = now(),\n    pausado_por = d.usuario,\n    ultimo_mensaje = now(),\n    ultimo_texto = d.texto,\n    actualizado_en = now()\n  FROM datos d\n  WHERE c.phone_number_id = d.phone_number_id AND c.wa_id = d.wa_id\n  RETURNING c.phone_number_id, c.wa_id, c.nombre, c.crm_lead_id\n), evento AS (\n  INSERT INTO public.crm_eventos (phone_number_id, wa_id, tipo, payload)\n  SELECT\n    c.phone_number_id, c.wa_id, 'intervencion_humana',\n    jsonb_build_object(\n      'tipo', 'intervencion_humana',\n      'timestamp', now(),\n      'origen', 'portal_conversaciones',\n      'contacto', jsonb_build_object(\n        'wa_id', c.wa_id,\n        'nombre', c.nombre,\n        'phone_number_id', c.phone_number_id\n      ),\n      'actor', d.usuario,\n      'crm_lead_id', c.crm_lead_id\n    )\n  FROM conversacion c CROSS JOIN datos d\n)\nSELECT message_id, usuario AS autor FROM datos;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validar clave y solicitud').item.json.phone_number_id, $('Validar clave y solicitud').item.json.wa_id, $('Validar clave y solicitud').item.json.texto, $('Validar clave y solicitud').item.json.usuario, $json.messages[0].id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [464, -144],
+      "id": "3ee30b44-c235-4457-92c8-a62e4899a6c3",
+      "name": "Registrar humano y pausar bot",
+      "credentials": {
+        "postgres": { "id": "Cpk8ls3nVc2hXeAN", "name": "SUPABASE" }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:true, message_id:$json.message_id, autor:$json.autor, bot_activo:false }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [688, -144],
+      "id": "0297c624-5689-4f10-9954-f886a5f00c94",
+      "name": "Responder envio correcto"
+    }
+  ],
+  "connections": {
+    "POST portal enviar": { "main": [[{ "node": "Validar clave y solicitud", "type": "main", "index": 0 }]] },
+    "Validar clave y solicitud": { "main": [[{ "node": "IF solicitud valida", "type": "main", "index": 0 }]] },
+    "IF solicitud valida": {
+      "main": [
+        [{ "node": "Verificar conversacion y ventana", "type": "main", "index": 0 }],
+        [{ "node": "Responder error solicitud", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verificar conversacion y ventana": { "main": [[{ "node": "IF ventana abierta", "type": "main", "index": 0 }]] },
+    "IF ventana abierta": {
+      "main": [
+        [{ "node": "Enviar mensaje WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "Responder ventana cerrada", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar mensaje WhatsApp": { "main": [[{ "node": "Registrar humano y pausar bot", "type": "main", "index": 0 }]] },
+    "Registrar humano y pausar bot": { "main": [[{ "node": "Responder envio correcto", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "92def057-7049-4df5-9344-57f2d5bb3d08",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "211e2c14e90323b3e38e0a830e3a51168e3db8e2f58e0eecc0ae0650a3bdb773"
+  },
+  "tags": []
+}

@@ -1,0 +1,130 @@
+import { config } from './config.js';
+import { query } from './db.js';
+import { demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
+import type { Conversation, Message } from './types.js';
+
+export async function listConversations(search = ''): Promise<Conversation[]> {
+  if (config.DEMO_MODE) {
+    const term = search.trim().toLowerCase();
+    return getDemoConversations()
+      .filter((item) => !term || item.nombre.toLowerCase().includes(term) || item.wa_id.includes(term))
+      .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
+  }
+
+  return query<Conversation>(
+    `SELECT phone_number_id,
+            wa_id,
+            COALESCE(nombre, 'Sin nombre') AS nombre,
+            COALESCE(ultimo_texto, '') AS ultimo_texto,
+            ultimo_mensaje,
+            COALESCE(no_leidos, 0)::int AS no_leidos,
+            COALESCE(bot_activo, TRUE) AS bot_activo,
+            COALESCE(ventana_abierta, FALSE) AS ventana_abierta,
+            ventana_expira,
+            COALESCE(tipo_ventana, 'cerrada') AS tipo_ventana,
+            COALESCE(fuente, 'WhatsApp Directo') AS fuente,
+            pausado_por,
+            pausado_en
+       FROM public.wa_bandeja
+      WHERE COALESCE(archivada, FALSE) = FALSE
+        AND ($1 = '' OR nombre ILIKE '%' || $1 || '%' OR wa_id ILIKE '%' || $1 || '%')
+      ORDER BY ultimo_mensaje DESC
+      LIMIT 100`,
+    [search.trim()]
+  );
+}
+
+export async function listMessages(phoneNumberId: string, waId: string): Promise<Message[]> {
+  if (config.DEMO_MODE) return demoMessages.get(demoKey(phoneNumberId, waId)) ?? [];
+
+  return query<Message>(
+    `SELECT id::text,
+            message_id,
+            phone_number_id,
+            wa_id,
+            direccion,
+            autor,
+            tipo,
+            COALESCE(texto, '') AS texto,
+            media_id,
+            COALESCE(estado, 'received') AS estado,
+            creado_en
+       FROM public.wa_mensajes
+      WHERE phone_number_id = $1 AND wa_id = $2
+      ORDER BY creado_en ASC
+      LIMIT 500`,
+    [phoneNumberId, waId]
+  );
+}
+
+export async function markRead(phoneNumberId: string, waId: string) {
+  if (config.DEMO_MODE) {
+    updateDemoConversation(phoneNumberId, waId, (item) => ({ ...item, no_leidos: 0 }));
+    return;
+  }
+
+  await query(
+    `UPDATE public.wa_conversaciones
+        SET no_leidos = 0
+      WHERE phone_number_id = $1 AND wa_id = $2`,
+    [phoneNumberId, waId]
+  );
+}
+
+export async function setBotActive(
+  phoneNumberId: string,
+  waId: string,
+  active: boolean,
+  actor: string
+) {
+  if (config.DEMO_MODE) {
+    updateDemoConversation(phoneNumberId, waId, (item) => ({
+      ...item,
+      bot_activo: active,
+      pausado_por: active ? null : actor,
+      pausado_en: active ? null : new Date().toISOString()
+    }));
+    return;
+  }
+
+  await query(
+    `UPDATE public.wa_conversaciones
+        SET bot_activo = $3,
+            pausado_en = CASE WHEN $3 THEN NULL ELSE NOW() END,
+            pausado_por = CASE WHEN $3 THEN NULL ELSE $4 END
+      WHERE phone_number_id = $1 AND wa_id = $2`,
+    [phoneNumberId, waId, active, actor]
+  );
+}
+
+export function addDemoOutgoingMessage(
+  phoneNumberId: string,
+  waId: string,
+  text: string,
+  actor: string
+): Message {
+  const message: Message = {
+    id: `demo-${Date.now()}`,
+    message_id: `wamid.demo.${Date.now()}`,
+    phone_number_id: phoneNumberId,
+    wa_id: waId,
+    direccion: 'out',
+    autor: actor,
+    tipo: 'text',
+    texto: text,
+    media_id: null,
+    estado: 'sent',
+    creado_en: new Date().toISOString()
+  };
+  const key = demoKey(phoneNumberId, waId);
+  demoMessages.set(key, [...(demoMessages.get(key) ?? []), message]);
+  updateDemoConversation(phoneNumberId, waId, (item) => ({
+    ...item,
+    ultimo_texto: text,
+    ultimo_mensaje: message.creado_en,
+    bot_activo: false,
+    pausado_por: actor,
+    pausado_en: message.creado_en
+  }));
+  return message;
+}
