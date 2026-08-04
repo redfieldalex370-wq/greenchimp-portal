@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import type { Conversation, Message, PortalUser } from './types';
 import { LoginScreen } from './components/LoginScreen';
@@ -17,7 +17,10 @@ export default function App() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [updatingBot, setUpdatingBot] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const [toast, setToast] = useState('');
+  const knownConversationKeys = useRef<Set<string> | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
 
   const selected = useMemo(
     () => conversations.find((item) => `${item.phone_number_id}:${item.wa_id}` === selectedKey) ?? null,
@@ -29,10 +32,36 @@ export default function App() {
     window.setTimeout(() => setToast(''), 3200);
   }, []);
 
+  const playNewConversationSound = useCallback(() => {
+    const context = audioContext.current;
+    if (!context || context.state !== 'running') return;
+    const now = context.currentTime;
+    for (const [frequency, delay] of [[740, 0], [980, 0.13]] as const) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.09, now + delay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.16);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(now + delay);
+      oscillator.stop(now + delay + 0.18);
+    }
+  }, []);
+
   const refreshConversations = useCallback(async (term = search) => {
     setLoadingConversations(true);
     try {
       const response = await api.conversations(term);
+      if (!term.trim()) {
+        const nextKeys = new Set(response.conversations.map((item) => `${item.phone_number_id}:${item.wa_id}`));
+        const known = knownConversationKeys.current;
+        if (known && response.conversations.some((item) => !known.has(`${item.phone_number_id}:${item.wa_id}`))) {
+          playNewConversationSound();
+          showToast('Nuevo chat recibido');
+        }
+        knownConversationKeys.current = nextKeys;
+      }
       setConversations(response.conversations);
       setSelectedKey((current) => {
         if (current && response.conversations.some((item) => `${item.phone_number_id}:${item.wa_id}` === current)) {
@@ -47,7 +76,21 @@ export default function App() {
     } finally {
       setLoadingConversations(false);
     }
-  }, [search, showToast]);
+  }, [search, showToast, playNewConversationSound]);
+
+  useEffect(() => {
+    if (!user) return;
+    const enableSound = () => {
+      audioContext.current ??= new AudioContext();
+      void audioContext.current.resume();
+    };
+    window.addEventListener('pointerdown', enableSound, { once: true });
+    window.addEventListener('keydown', enableSound, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', enableSound);
+      window.removeEventListener('keydown', enableSound);
+    };
+  }, [user]);
 
   const refreshMessages = useCallback(async (conversation: Conversation) => {
     setLoadingMessages(true);
@@ -152,6 +195,27 @@ export default function App() {
     }
   }
 
+  async function removeConversation() {
+    if (!selected) return;
+    const confirmed = window.confirm(
+      `¿Eliminar la conversación de ${selected.nombre}? Se borrarán también todos sus mensajes. Volverá a aparecer si el contacto escribe de nuevo.`
+    );
+    if (!confirmed) return;
+
+    setDeletingConversation(true);
+    try {
+      await api.deleteConversation(selected);
+      setSelectedKey(null);
+      setMessages([]);
+      await refreshConversations(search);
+      showToast('Conversación eliminada');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo eliminar la conversación.');
+    } finally {
+      setDeletingConversation(false);
+    }
+  }
+
   if (booting) return <div className="boot-screen"><div className="brand-orbit">GC</div><p>Abriendo la bandeja…</p></div>;
   if (!user) return <LoginScreen onLogin={login} />;
 
@@ -184,7 +248,13 @@ export default function App() {
           sending={sending}
           onSend={send}
         />
-        <ContactPanel conversation={selected} updatingBot={updatingBot} onToggleBot={toggleBot} />
+        <ContactPanel
+          conversation={selected}
+          updatingBot={updatingBot}
+          deleting={deletingConversation}
+          onToggleBot={toggleBot}
+          onDelete={removeConversation}
+        />
       </main>
 
       {toast && <div className="toast">{toast}</div>}

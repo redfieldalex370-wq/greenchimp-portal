@@ -176,3 +176,13 @@ export function updateDemoConversation(
   );
   if (index >= 0) conversations[index] = updater(conversations[index]!);
 }
+
+export function deleteDemoConversation(phoneNumberId: string, waId: string) {
+  const index = conversations.findIndex(
+    (item) => item.phone_number_id === phoneNumberId && item.wa_id === waId
+  );
+  if (index < 0) return false;
+  conversations.splice(index, 1);
+  demoMessages.delete(demoKey(phoneNumberId, waId));
+  return true;
+}

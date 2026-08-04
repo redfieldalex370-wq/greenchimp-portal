@@ -49,6 +49,11 @@ export const api = {
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/bot`,
       { method: 'POST', body: JSON.stringify({ active }) }
     ),
+  deleteConversation: (conversation: Conversation) =>
+    request<{ ok: true }>(
+      `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}`,
+      { method: 'DELETE' }
+    ),
   send: (conversation: Conversation, text: string) =>
     request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages`,

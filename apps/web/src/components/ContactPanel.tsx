@@ -4,11 +4,15 @@ import { initials, relativeTime, windowCountdown } from '../utils';
 export function ContactPanel({
   conversation,
   updatingBot,
-  onToggleBot
+  deleting,
+  onToggleBot,
+  onDelete
 }: {
   conversation: Conversation | null;
   updatingBot: boolean;
+  deleting: boolean;
   onToggleBot: (active: boolean) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   return (
     <aside className="contact-column">
@@ -62,6 +66,10 @@ export function ContactPanel({
             )}
             <p className="auto-reactivate">Se reactiva solo a las 24 h sin intervención.</p>
           </section>
+
+          <button className="delete-conversation" onClick={() => void onDelete()} disabled={deleting}>
+            {deleting ? 'Eliminando…' : 'Eliminar conversación'}
+          </button>
         </>
       )}
     </aside>

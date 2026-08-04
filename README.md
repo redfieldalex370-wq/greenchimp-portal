@@ -71,6 +71,7 @@ El navegador solicita el archivo a la API autenticada; el token de Meta nunca se
 | `GET` | `/api/auth/me` | Usuario actual |
 | `GET` | `/api/conversations` | Lista desde `wa_bandeja` |
 | `GET` | `/api/conversations/:phoneNumberId/:waId/messages` | Hilo completo |
+| `DELETE` | `/api/conversations/:phoneNumberId/:waId` | Elimina conversación y mensajes |
 | `GET` | `/api/messages/:messageId/media` | Descarga multimedia desde Meta |
 | `POST` | `/api/conversations/:phoneNumberId/:waId/messages` | Envía por n8n |
 | `POST` | `/api/conversations/:phoneNumberId/:waId/bot` | Pausa o reactiva |

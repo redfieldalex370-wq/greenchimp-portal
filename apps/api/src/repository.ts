@@ -1,6 +1,6 @@
 import { config } from './config.js';
 import { query } from './db.js';
-import { demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
+import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
 export async function listConversations(search = ''): Promise<Conversation[]> {
@@ -88,6 +88,20 @@ export async function markRead(phoneNumberId: string, waId: string) {
       WHERE phone_number_id = $1 AND wa_id = $2`,
     [phoneNumberId, waId]
   );
+}
+
+export async function deleteConversation(phoneNumberId: string, waId: string): Promise<boolean> {
+  if (config.DEMO_MODE) {
+    return deleteDemoConversation(phoneNumberId, waId);
+  }
+
+  const rows = await query<{ phone_number_id: string }>(
+    `DELETE FROM public.wa_conversaciones
+      WHERE phone_number_id = $1 AND wa_id = $2
+      RETURNING phone_number_id`,
+    [phoneNumberId, waId]
+  );
+  return rows.length > 0;
 }
 
 export async function setBotActive(

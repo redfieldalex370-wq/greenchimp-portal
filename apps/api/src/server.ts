@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
 import {
   addDemoOutgoingMessage,
+  deleteConversation,
   getMessageMedia,
   listConversations,
   listMessages,
@@ -95,6 +96,20 @@ app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (
       ok: true,
       messages: await listMessages(params.phoneNumberId, params.waId)
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/conversations/:phoneNumberId/:waId', requireAuth, async (req, res, next) => {
+  try {
+    const params = conversationParamsSchema.parse(req.params);
+    const deleted = await deleteConversation(params.phoneNumberId, params.waId);
+    if (!deleted) {
+      res.status(404).json({ ok: false, error: 'La conversación ya no existe.' });
+      return;
+    }
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }
