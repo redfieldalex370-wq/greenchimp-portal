@@ -31,9 +31,9 @@ export const api = {
       body: JSON.stringify({ username, password })
     }),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),
-  conversations: (search = '') =>
+  conversations: (search = '', phoneNumberId = '') =>
     request<{ ok: true; conversations: Conversation[] }>(
-      `/conversations${search ? `?search=${encodeURIComponent(search)}` : ''}`
+      `/conversations?phone_number_id=${encodeURIComponent(phoneNumberId)}${search ? `&search=${encodeURIComponent(search)}` : ''}`
     ),
   messages: (conversation: Conversation) =>
     request<{ ok: true; messages: Message[] }>(

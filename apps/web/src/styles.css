@@ -31,6 +31,15 @@ button { color: inherit; }
 .brand-mark--large { width: 58px; height: 58px; border-radius: 17px; font-size: 21px; margin-bottom: 20px; }
 .topbar-user button { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
 .topbar-user button:hover { border-color: #465249; }
+.account-switcher { display: flex; align-items: center; gap: 7px; padding: 4px; border: 1px solid var(--line); border-radius: 13px; background: #0d120f; }
+.account-switcher button { display: flex; align-items: center; gap: 8px; min-width: 152px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #9ba79f; padding: 6px 9px; cursor: pointer; text-align: left; }
+.account-switcher button:hover { background: #151c18; }
+.account-switcher button.is-active { border-color: rgba(182,255,59,.28); background: rgba(182,255,59,.09); color: var(--text); }
+.account-switcher button > span:first-child { width: 27px; height: 27px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 8px; background: #253029; color: var(--lime); font-size: 10px; font-weight: 900; }
+.account-switcher button > span:last-child { min-width: 0; display: grid; gap: 1px; }
+.account-switcher strong, .account-switcher small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.account-switcher strong { font-size: 11px; }
+.account-switcher small { color: var(--muted); font-size: 9px; }
 
 .workspace { height: calc(100vh - 68px); display: grid; grid-template-columns: 320px minmax(420px, 1fr) 300px; max-width: 1720px; margin: 0 auto; border-inline: 1px solid var(--line); background: var(--panel); }
 .conversation-column, .contact-column, .thread-column { min-width: 0; min-height: 0; }
@@ -146,6 +155,8 @@ button { color: inherit; }
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 10; max-width: min(90vw, 520px); background: #202823; color: #eef4f0; border: 1px solid #3a463f; border-radius: 12px; padding: 11px 14px; box-shadow: var(--shadow); font-size: 12px; }
 
 @media (max-width: 1100px) {
+  .account-switcher button { min-width: 0; }
+  .account-switcher button > span:last-child { display: none; }
   .workspace { grid-template-columns: 300px minmax(420px, 1fr); }
   .contact-column { display: none; }
 }
@@ -154,6 +165,7 @@ button { color: inherit; }
   body { overflow: auto; }
   .topbar { height: 60px; }
   .topbar-brand span, .topbar-user > div { display: none; }
+  .account-switcher { margin-left: auto; margin-right: 10px; }
   .workspace { height: auto; min-height: calc(100vh - 60px); grid-template-columns: 1fr; grid-template-rows: 245px minmax(560px, calc(100vh - 60px)); border: 0; }
   .conversation-column { border-right: 0; border-bottom: 1px solid var(--line); }
   .thread-header { padding-inline: 14px; }

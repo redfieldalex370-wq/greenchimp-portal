@@ -29,7 +29,10 @@ export function sendManualMessage(input: {
   text: string;
   actor: string;
 }) {
-  return callN8n(config.N8N_SEND_URL || undefined, {
+  const url = input.phoneNumberId === config.DENTAL_PHONE_NUMBER_ID
+    ? config.N8N_DENTAL_SEND_URL
+    : config.N8N_SEND_URL;
+  return callN8n(url || undefined, {
     phone_number_id: input.phoneNumberId,
     wa_id: input.waId,
     texto: input.text,

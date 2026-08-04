@@ -78,6 +78,18 @@ El navegador solicita el archivo a la API autenticada; el token de Meta nunca se
 | `POST` | `/api/conversations/:phoneNumberId/:waId/read` | Marca como leído |
 | `GET` | `/api/health` | Salud del servicio |
 
+## Varias cuentas de WhatsApp
+
+El portal separa las bandejas por `phone_number_id`. La interfaz incluye las cuentas
+Green Chimp (`1240006745865858`) y Especialidades dentales (`620774694457849`).
+Las credenciales privadas de la segunda cuenta se configuran solo en el backend:
+
+- `WHATSAPP_DENTAL_ACCESS_TOKEN`: token usado para descargar multimedia dental.
+- `N8N_DENTAL_SEND_URL`: webhook privado de n8n para enviar mensajes manuales.
+- `DENTAL_PHONE_NUMBER_ID`: identificador de Meta; por defecto `620774694457849`.
+
+Nunca agregues estos tokens como variables `VITE_*` ni los guardes en el repositorio.
+
 ## Producción
 
 ```bash

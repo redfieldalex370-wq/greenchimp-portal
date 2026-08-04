@@ -83,7 +83,8 @@ app.get('/api/auth/me', async (req, res, next) => {
 app.get('/api/conversations', requireAuth, async (req, res, next) => {
   try {
     const search = typeof req.query.search === 'string' ? req.query.search : '';
-    res.json({ ok: true, conversations: await listConversations(search) });
+    const phoneNumberId = typeof req.query.phone_number_id === 'string' ? req.query.phone_number_id : '';
+    res.json({ ok: true, conversations: await listConversations(search, phoneNumberId) });
   } catch (error) {
     next(error);
   }
@@ -125,12 +126,15 @@ app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) =>
       res.status(404).json({ ok: false, error: 'Archivo multimedia no encontrado.' });
       return;
     }
-    if (!config.WHATSAPP_ACCESS_TOKEN) {
+    const accessToken = media.phone_number_id === config.DENTAL_PHONE_NUMBER_ID
+      ? config.WHATSAPP_DENTAL_ACCESS_TOKEN
+      : config.WHATSAPP_ACCESS_TOKEN;
+    if (!accessToken) {
       res.status(503).json({ ok: false, error: 'Falta configurar WHATSAPP_ACCESS_TOKEN.' });
       return;
     }
 
-    const authorization = `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`;
+    const authorization = `Bearer ${accessToken}`;
     const metadataResponse = await fetch(
       `https://graph.facebook.com/${config.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(media.media_id)}`,
       { headers: { authorization } }

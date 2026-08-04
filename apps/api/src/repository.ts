@@ -3,11 +3,12 @@ import { query } from './db.js';
 import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
-export async function listConversations(search = ''): Promise<Conversation[]> {
+export async function listConversations(search = '', phoneNumberId = ''): Promise<Conversation[]> {
   if (config.DEMO_MODE) {
     const term = search.trim().toLowerCase();
     return getDemoConversations()
-      .filter((item) => !term || item.nombre.toLowerCase().includes(term) || item.wa_id.includes(term))
+      .filter((item) => (!phoneNumberId || item.phone_number_id === phoneNumberId)
+        && (!term || item.nombre.toLowerCase().includes(term) || item.wa_id.includes(term)))
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
@@ -25,12 +26,13 @@ export async function listConversations(search = ''): Promise<Conversation[]> {
             COALESCE(fuente, 'WhatsApp Directo') AS fuente,
             pausado_por,
             pausado_en
-       FROM public.wa_bandeja
+      FROM public.wa_bandeja
       WHERE COALESCE(archivada, FALSE) = FALSE
-        AND ($1 = '' OR nombre ILIKE '%' || $1 || '%' OR wa_id ILIKE '%' || $1 || '%')
+        AND ($1 = '' OR phone_number_id = $1)
+        AND ($2 = '' OR nombre ILIKE '%' || $2 || '%' OR wa_id ILIKE '%' || $2 || '%')
       ORDER BY ultimo_mensaje DESC
       LIMIT 100`,
-    [search.trim()]
+    [phoneNumberId.trim(), search.trim()]
   );
 }
 
@@ -57,17 +59,21 @@ export async function listMessages(phoneNumberId: string, waId: string): Promise
   );
 }
 
-export async function getMessageMedia(messageId: string): Promise<Pick<Message, 'media_id' | 'tipo'> | null> {
+export async function getMessageMedia(messageId: string): Promise<Pick<Message, 'media_id' | 'tipo' | 'phone_number_id'> | null> {
   if (config.DEMO_MODE) {
     for (const messages of demoMessages.values()) {
       const message = messages.find((item) => item.id === messageId);
-      if (message?.media_id) return { media_id: message.media_id, tipo: message.tipo };
+      if (message?.media_id) return {
+        media_id: message.media_id,
+        tipo: message.tipo,
+        phone_number_id: message.phone_number_id
+      };
     }
     return null;
   }
 
-  const rows = await query<Pick<Message, 'media_id' | 'tipo'>>(
-    `SELECT media_id, tipo
+  const rows = await query<Pick<Message, 'media_id' | 'tipo' | 'phone_number_id'>>(
+    `SELECT media_id, tipo, phone_number_id
        FROM public.wa_mensajes
       WHERE id::text = $1 AND media_id IS NOT NULL
       LIMIT 1`,

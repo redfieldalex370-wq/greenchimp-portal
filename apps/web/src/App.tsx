@@ -6,8 +6,14 @@ import { ConversationList } from './components/ConversationList';
 import { MessageThread } from './components/MessageThread';
 import { ContactPanel } from './components/ContactPanel';
 
+const PORTAL_ACCOUNTS = [
+  { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
+  { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
+] as const;
+
 export default function App() {
   const [user, setUser] = useState<PortalUser | null>(null);
+  const [activeAccountId, setActiveAccountId] = useState<string>(PORTAL_ACCOUNTS[0].id);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -52,7 +58,7 @@ export default function App() {
   const refreshConversations = useCallback(async (term = search) => {
     setLoadingConversations(true);
     try {
-      const response = await api.conversations(term);
+      const response = await api.conversations(term, activeAccountId);
       if (!term.trim()) {
         const nextKeys = new Set(response.conversations.map((item) => `${item.phone_number_id}:${item.wa_id}`));
         const known = knownConversationKeys.current;
@@ -76,7 +82,7 @@ export default function App() {
     } finally {
       setLoadingConversations(false);
     }
-  }, [search, showToast, playNewConversationSound]);
+  }, [search, activeAccountId, showToast, playNewConversationSound]);
 
   useEffect(() => {
     if (!user) return;
@@ -153,6 +159,15 @@ export default function App() {
     setMessages([]);
   }
 
+  function selectAccount(phoneNumberId: string) {
+    if (phoneNumberId === activeAccountId) return;
+    setActiveAccountId(phoneNumberId);
+    setSearch('');
+    setSelectedKey(null);
+    setMessages([]);
+    knownConversationKeys.current = null;
+  }
+
   async function send(text: string) {
     if (!selected) return;
     setSending(true);
@@ -226,6 +241,20 @@ export default function App() {
           <div className="brand-mark">GC</div>
           <div><strong>Green Chimp</strong><span>Portal de conversaciones</span></div>
         </div>
+        <nav className="account-switcher" aria-label="Cuentas de WhatsApp">
+          {PORTAL_ACCOUNTS.map((account) => (
+            <button
+              key={account.id}
+              className={account.id === activeAccountId ? 'is-active' : ''}
+              onClick={() => selectAccount(account.id)}
+              aria-pressed={account.id === activeAccountId}
+              title={`${account.name} · ${account.number}`}
+            >
+              <span>{account.initials}</span>
+              <span><strong>{account.name}</strong><small>{account.number}</small></span>
+            </button>
+          ))}
+        </nav>
         <div className="topbar-user">
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
           <button onClick={() => void logout()}>Salir</button>
