@@ -85,7 +85,7 @@ Green Chimp (`1240006745865858`) y Especialidades dentales (`620774694457849`).
 Las credenciales privadas de la segunda cuenta se configuran solo en el backend:
 
 - `WHATSAPP_DENTAL_ACCESS_TOKEN`: token usado para descargar multimedia dental.
-- `N8N_DENTAL_SEND_URL`: webhook privado de n8n para enviar mensajes manuales.
+- `N8N_DENTAL_SEND_URL`: webhook privado de n8n para enviar mensajes manuales. En esta instalación es `https://n8n.srv1177068.hstgr.cloud/webhook/portal/dental/enviar`.
 - `DENTAL_PHONE_NUMBER_ID`: identificador de Meta; por defecto `620774694457849`.
 
 Nunca agregues estos tokens como variables `VITE_*` ni los guardes en el repositorio.
