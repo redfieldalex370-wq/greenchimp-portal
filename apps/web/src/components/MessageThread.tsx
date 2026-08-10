@@ -36,6 +36,19 @@ function SendIcon() {
   );
 }
 
+function isBraveBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const braveFlag = (navigator as Navigator & { brave?: unknown }).brave;
+  return typeof braveFlag !== 'undefined';
+}
+
+function preferredAudioMimeType() {
+  if (typeof MediaRecorder === 'undefined') return '';
+  if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+  if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) return 'audio/ogg;codecs=opus';
+  return '';
+}
+
 function MediaContent({ message }: { message: Message }) {
   if (!message.media_id || !message.id) {
     return <p>{message.texto || 'Contenido multimedia no disponible'}</p>;
@@ -101,6 +114,8 @@ export function MessageThread({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const audioMimeType = preferredAudioMimeType();
+  const canRecordAudio = !isBraveBrowser() && Boolean(audioMimeType) && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -217,23 +232,20 @@ export function MessageThread({
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
         throw new Error('Este navegador no permite grabar audio desde la pagina.');
       }
+      if (isBraveBrowser()) {
+        throw new Error('La grabacion por microfono se desactivo en Brave. Usa Google Chrome para mandar audio.');
+      }
 
       setAttachmentMenuOpen(false);
       setStickerPickerOpen(false);
       clearAttachment();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-          ? 'audio/ogg;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus'
-          : '';
+      const mimeType = preferredAudioMimeType();
 
       if (!mimeType) {
         stream.getTracks().forEach((track) => track.stop());
-        throw new Error('Tu navegador no pudo iniciar una grabacion compatible.');
+        throw new Error('Este navegador no genera un audio compatible. Usa Google Chrome para grabar.');
       }
 
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -445,8 +457,15 @@ export function MessageThread({
             type="button"
             className={`mic-button ${recording ? 'mic-button--recording' : ''}`}
             onClick={() => void (recording ? stopAudioRecording() : startAudioRecording())}
-            disabled={!conversation.ventana_abierta || sending}
+            disabled={!conversation.ventana_abierta || sending || (!recording && !canRecordAudio)}
             aria-label={recording ? 'Detener grabacion' : 'Grabar audio'}
+            title={
+              recording
+                ? 'Detener grabacion'
+                : canRecordAudio
+                  ? 'Grabar audio'
+                  : 'La grabacion por microfono esta disponible en Google Chrome'
+            }
           >
             {recording ? <span className="mic-button__stop" aria-hidden="true" /> : <MicIcon />}
           </button>
