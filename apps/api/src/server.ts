@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import multer from 'multer';
+import sharp from 'sharp';
 import { z } from 'zod';
 import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
@@ -18,7 +19,7 @@ import {
   setBotActive
 } from './repository.js';
 import { sendManualMessage } from './n8n.js';
-import { sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
+import { normalizeUploadMimeType, sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
 
 const app = express();
 const conversationParamsSchema = z.object({
@@ -29,6 +30,67 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024, files: 1 }
 });
+
+async function prepareOutgoingFile(input: {
+  file: Express.Multer.File;
+  type: 'image' | 'audio' | 'video' | 'sticker';
+}): Promise<Express.Multer.File> {
+  if (input.type === 'sticker') {
+    const webpBuffer = await sharp(input.file.buffer)
+      .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    if (webpBuffer.byteLength > 100 * 1024) {
+      const compactBuffer = await sharp(input.file.buffer)
+        .resize(384, 384, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 64 })
+        .toBuffer();
+
+      if (compactBuffer.byteLength > 100 * 1024) {
+        throw Object.assign(new Error('El sticker sigue siendo muy pesado. Usa una imagen mas simple o pequena.'), {
+          status: 400
+        });
+      }
+
+      return {
+        ...input.file,
+        originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'sticker'}.webp`,
+        mimetype: 'image/webp',
+        buffer: compactBuffer,
+        size: compactBuffer.byteLength
+      };
+    }
+
+    return {
+      ...input.file,
+      originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'sticker'}.webp`,
+      mimetype: 'image/webp',
+      buffer: webpBuffer,
+      size: webpBuffer.byteLength
+    };
+  }
+
+  if (input.type === 'audio') {
+    const normalizedMimeType = normalizeUploadMimeType(input.file.mimetype);
+    const extension =
+      normalizedMimeType === 'audio/ogg'
+        ? 'ogg'
+        : normalizedMimeType === 'audio/mp4'
+          ? 'm4a'
+          : normalizedMimeType === 'audio/webm'
+            ? 'webm'
+            : input.file.originalname.split('.').pop() || 'audio';
+
+    return {
+      ...input.file,
+      originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'audio'}.${extension}`,
+      mimetype: normalizedMimeType
+    };
+  }
+
+  return input.file;
+}
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false }));
 app.use(express.json({ limit: '1mb' }));
@@ -253,16 +315,17 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       res.status(400).json({ ok: false, error: 'El archivo debe ser audio.' });
       return;
     }
-      if (input.type === 'video' && !file.mimetype.startsWith('video/')) {
-        res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
-        return;
-      }
-      if (input.type === 'sticker' && !file.mimetype.startsWith('image/')) {
-        res.status(400).json({ ok: false, error: 'El sticker debe ser una imagen.' });
-        return;
-      }
+    if (input.type === 'video' && !file.mimetype.startsWith('video/')) {
+      res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
+      return;
+    }
+    if (input.type === 'sticker' && !file.mimetype.startsWith('image/')) {
+      res.status(400).json({ ok: false, error: 'El sticker debe ser una imagen.' });
+      return;
+    }
 
-      const actor = res.locals.user.name as string;
+    const preparedFile = await prepareOutgoingFile({ file, type: input.type });
+    const actor = res.locals.user.name as string;
     let mediaId: string;
     let messageId: string;
 
@@ -272,7 +335,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
     } else {
       const uploadResult = await uploadWhatsAppMedia({
         phoneNumberId: params.phoneNumberId,
-        file
+        file: preparedFile
       });
       mediaId = uploadResult.id;
       const sendResult = await sendWhatsAppMedia({

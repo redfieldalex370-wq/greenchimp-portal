@@ -28,11 +28,12 @@ export async function uploadWhatsAppMedia(input: {
   phoneNumberId: string;
   file: Express.Multer.File;
 }) {
+  const normalizedMimeType = normalizeUploadMimeType(input.file.mimetype);
   const fileBytes = new Uint8Array(input.file.buffer.byteLength);
   fileBytes.set(input.file.buffer);
   const form = new FormData();
   form.set('messaging_product', 'whatsapp');
-  form.set('file', new Blob([fileBytes], { type: input.file.mimetype }), input.file.originalname);
+  form.set('file', new Blob([fileBytes], { type: normalizedMimeType }), input.file.originalname);
 
   const response = await fetch(
     `https://graph.facebook.com/${config.WHATSAPP_GRAPH_VERSION}/${encodeURIComponent(input.phoneNumberId)}/media`,
@@ -45,6 +46,17 @@ export async function uploadWhatsAppMedia(input: {
   );
 
   return readMetaJson<{ id: string }>(response, 'Meta no pudo subir el archivo multimedia.');
+}
+
+export function normalizeUploadMimeType(mimetype: string) {
+  const lower = mimetype.toLowerCase();
+  if (lower.startsWith('audio/webm')) return 'audio/webm';
+  if (lower.startsWith('audio/ogg')) return 'audio/ogg';
+  if (lower.startsWith('audio/mp4')) return 'audio/mp4';
+  if (lower.startsWith('image/webp')) return 'image/webp';
+  if (lower.startsWith('image/png')) return 'image/png';
+  if (lower.startsWith('image/jpeg')) return 'image/jpeg';
+  return mimetype;
 }
 
 export async function sendWhatsAppMedia(input: {
