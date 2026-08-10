@@ -257,8 +257,8 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
       return;
     }
-    if (input.type === 'sticker' && !['image/webp', 'image/png'].includes(file.mimetype)) {
-      res.status(400).json({ ok: false, error: 'El sticker debe ser WEBP o PNG.' });
+    if (input.type === 'sticker' && file.mimetype !== 'image/webp') {
+      res.status(400).json({ ok: false, error: 'El sticker debe ser WEBP. Para PNG o JPG usa la opcion Imagen.' });
       return;
     }
 
@@ -291,6 +291,46 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       actor,
       type: input.type,
       mediaId,
+      messageId,
+      caption: input.caption
+    });
+
+    res.status(201).json({ ok: true, message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAuth, async (req, res, next) => {
+  try {
+    const params = conversationParamsSchema.parse(req.params);
+    const input = z.object({
+      type: z.enum(['image', 'audio', 'video', 'sticker']),
+      media_id: z.string().trim().min(1).max(256),
+      caption: z.string().trim().max(1024).optional().default('')
+    }).parse(req.body);
+    const actor = res.locals.user.name as string;
+
+    let messageId: string;
+    if (config.DEMO_MODE) {
+      messageId = `wamid.demo.media.${Date.now()}`;
+    } else {
+      const sendResult = await sendWhatsAppMedia({
+        phoneNumberId: params.phoneNumberId,
+        waId: params.waId,
+        mediaId: input.media_id,
+        kind: input.type,
+        caption: input.caption
+      });
+      messageId = sendResult.messages?.[0]?.id ?? `wamid.portal.media.${Date.now()}`;
+    }
+
+    const message = await addOutgoingMediaMessage({
+      phoneNumberId: params.phoneNumberId,
+      waId: params.waId,
+      actor,
+      type: input.type,
+      mediaId: input.media_id,
       messageId,
       caption: input.caption
     });

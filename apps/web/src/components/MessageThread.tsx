@@ -40,7 +40,8 @@ export function MessageThread({
   loading,
   sending,
   onSend,
-  onSendMedia
+  onSendMedia,
+  onSendMediaById
 }: {
   conversation: Conversation | null;
   messages: Message[];
@@ -48,15 +49,20 @@ export function MessageThread({
   sending: boolean;
   onSend: (text: string) => Promise<void>;
   onSendMedia: (type: string, file: File, caption: string) => Promise<void>;
+  onSendMediaById: (type: string, mediaId: string, caption: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [recording, setRecording] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const stickerInputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,6 +76,7 @@ export function MessageThread({
 
   useEffect(() => {
     setAttachmentMenuOpen(false);
+    setStickerPickerOpen(false);
     clearAttachment();
   }, [conversation?.wa_id]);
 
@@ -131,6 +138,50 @@ export function MessageThread({
     setAttachmentMenuOpen(false);
   }
 
+  async function startAudioRecording() {
+    setAttachmentMenuOpen(false);
+    clearAttachment();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    recordingChunksRef.current = [];
+    recordingStreamRef.current = stream;
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+      const file = new File([blob], `audio-${Date.now()}.webm`, { type: blob.type });
+      setPendingAttachment({
+        file,
+        kind: 'audio',
+        previewUrl: URL.createObjectURL(file)
+      });
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      recorderRef.current = null;
+      setRecording(false);
+    };
+    recorder.start();
+    setRecording(true);
+  }
+
+  function stopAudioRecording() {
+    recorderRef.current?.stop();
+  }
+
+  async function sendExistingSticker(mediaId: string) {
+    if (!conversation?.ventana_abierta || sending) return;
+    setStickerPickerOpen(false);
+    await onSendMediaById('sticker', mediaId, '');
+  }
+
+  const recentStickers = messages
+    .filter((message) => message.tipo.toLowerCase() === 'sticker' && message.media_id && message.id)
+    .filter((message, index, list) => list.findIndex((item) => item.media_id === message.media_id) === index)
+    .slice(-18)
+    .reverse();
+
   return (
     <section className="thread-column">
       <header className="thread-header">
@@ -169,17 +220,13 @@ export function MessageThread({
 
       <form className={`composer ${pendingAttachment ? 'composer--with-attachment' : ''}`} onSubmit={submit}>
         {pendingAttachment && (
-          <div className="attachment-preview">
+          <div className={`attachment-preview attachment-preview--${pendingAttachment.kind}`}>
             <div className="attachment-preview__media">
               {pendingAttachment.kind === 'audio'
                 ? <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
                 : pendingAttachment.kind === 'video'
                   ? <video src={pendingAttachment.previewUrl} controls preload="metadata" />
                 : <img src={pendingAttachment.previewUrl} alt="Sticker seleccionado" />}
-            </div>
-            <div className="attachment-preview__meta">
-              <strong>{pendingAttachment.file.name}</strong>
-              <span>Listo para conectar al envio multimedia.</span>
             </div>
             <button type="button" className="attachment-preview__remove" onClick={clearAttachment} aria-label="Quitar archivo">
               x
@@ -204,7 +251,7 @@ export function MessageThread({
                   <span>I</span>
                   Imagen
                 </button>
-                <button type="button" onClick={() => audioInputRef.current?.click()}>
+                <button type="button" onClick={() => void startAudioRecording()}>
                   <span>A</span>
                   Audio
                 </button>
@@ -212,10 +259,32 @@ export function MessageThread({
                   <span>V</span>
                   Video
                 </button>
-                <button type="button" onClick={() => stickerInputRef.current?.click()}>
+                <button type="button" onClick={() => {
+                  setStickerPickerOpen((open) => !open);
+                  setAttachmentMenuOpen(false);
+                }}>
                   <span>S</span>
                   Sticker
                 </button>
+              </div>
+            )}
+            {stickerPickerOpen && (
+              <div className="sticker-picker">
+                <div className="sticker-picker__grid">
+                  {recentStickers.map((message) => (
+                    <button
+                      type="button"
+                      key={message.id}
+                      onClick={() => void sendExistingSticker(message.media_id!)}
+                      aria-label="Enviar sticker"
+                    >
+                      <img src={`/api/messages/${encodeURIComponent(message.id)}/media`} alt="" loading="lazy" />
+                    </button>
+                  ))}
+                  <button type="button" className="sticker-picker__upload" onClick={() => stickerInputRef.current?.click()}>
+                    +
+                  </button>
+                </div>
               </div>
             )}
             <input
@@ -228,15 +297,8 @@ export function MessageThread({
             <input
               ref={stickerInputRef}
               type="file"
-              accept="image/webp,image/png,image/jpeg"
+              accept="image/webp"
               onChange={(event) => selectAttachment('sticker', event)}
-              hidden
-            />
-            <input
-              ref={audioInputRef}
-              type="file"
-              accept="audio/*"
-              onChange={(event) => selectAttachment('audio', event)}
               hidden
             />
             <input
@@ -247,6 +309,11 @@ export function MessageThread({
               hidden
             />
           </div>
+        {recording && (
+          <button type="button" className="recording-chip" onClick={stopAudioRecording}>
+            Grabando... tocar para detener
+          </button>
+        )}
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}

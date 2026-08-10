@@ -211,6 +211,20 @@ export default function App() {
     }
   }
 
+  async function sendMediaById(type: string, mediaId: string, caption: string) {
+    if (!selected) return;
+    setSending(true);
+    try {
+      await api.sendMediaById(selected, type, mediaId, caption);
+      await Promise.all([refreshMessages(selected), refreshConversations(search)]);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo enviar el sticker.');
+      throw error;
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function toggleBot(active: boolean) {
     if (!selected) return;
     setUpdatingBot(true);
@@ -291,6 +305,7 @@ export default function App() {
           sending={sending}
           onSend={send}
           onSendMedia={sendMedia}
+          onSendMediaById={sendMediaById}
         />
         <ContactPanel
           conversation={selected}

@@ -205,42 +205,35 @@ export async function addOutgoingMediaMessage(input: {
   }
 
   const rows = await query<Message>(
-    `WITH inserted AS (
-       INSERT INTO public.wa_mensajes
-         (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-       VALUES ($1, $2, 'out', $3, $4, NULLIF($5, ''), $6, $7, 'sent', NOW())
-       ON CONFLICT (message_id) DO UPDATE SET estado = EXCLUDED.estado
-       RETURNING id::text,
-                 message_id,
-                 phone_number_id,
-                 wa_id,
-                 direccion,
-                 autor,
-                 tipo,
-                 COALESCE(texto, '') AS texto,
-                 media_id,
-                 estado,
-                 creado_en
-     )
-     UPDATE public.wa_conversaciones
+    `INSERT INTO public.wa_mensajes
+       (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+     VALUES ($1, $2, 'out', $3, $4, NULLIF($5, ''), $6, $7, 'sent', NOW())
+     ON CONFLICT (message_id) DO UPDATE
+       SET estado = EXCLUDED.estado,
+           media_id = EXCLUDED.media_id,
+           texto = EXCLUDED.texto
+     RETURNING id::text,
+               message_id,
+               phone_number_id,
+               wa_id,
+               direccion,
+               autor,
+               tipo,
+               COALESCE(texto, '') AS texto,
+               media_id,
+               estado,
+               creado_en`,
+    [input.phoneNumberId, input.waId, input.actor, input.type, input.caption, input.mediaId, input.messageId]
+  );
+  await query(
+    `UPDATE public.wa_conversaciones
         SET ultimo_mensaje = NOW(),
-            ultimo_texto = COALESCE(NULLIF($5, ''), $4),
+            ultimo_texto = COALESCE(NULLIF($3, ''), $4),
             bot_activo = FALSE,
             pausado_en = NOW(),
-            pausado_por = $3
-      WHERE phone_number_id = $1 AND wa_id = $2
-      RETURNING (SELECT id FROM inserted)::text AS id,
-                (SELECT message_id FROM inserted) AS message_id,
-                $1 AS phone_number_id,
-                $2 AS wa_id,
-                'out' AS direccion,
-                $3 AS autor,
-                $4 AS tipo,
-                $5 AS texto,
-                $6 AS media_id,
-                'sent' AS estado,
-                NOW() AS creado_en`,
-    [input.phoneNumberId, input.waId, input.actor, input.type, input.caption, input.mediaId, input.messageId]
+            pausado_por = $5
+      WHERE phone_number_id = $1 AND wa_id = $2`,
+    [input.phoneNumberId, input.waId, input.caption, input.type, input.actor]
   );
   return rows[0] ?? null;
 }

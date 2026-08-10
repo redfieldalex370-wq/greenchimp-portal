@@ -69,5 +69,10 @@ export const api = {
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media`,
       { method: 'POST', body }
     )
-  }
+  },
+  sendMediaById: (conversation: Conversation, type: string, mediaId: string, caption = '') =>
+    request<{ ok: true; message?: Message }>(
+      `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media-id`,
+      { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption }) }
+    )
 };
