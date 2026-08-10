@@ -18,7 +18,7 @@ import {
   markRead,
   setBotActive
 } from './repository.js';
-import { sendManualMessage } from './n8n.js';
+import { sendManualAudio, sendManualMessage } from './n8n.js';
 import { normalizeUploadMimeType, sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
 
 const app = express();
@@ -344,6 +344,18 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
     if (config.DEMO_MODE) {
       mediaId = `demo-media-${Date.now()}`;
       messageId = `wamid.demo.media.${Date.now()}`;
+    } else if (input.type === 'audio') {
+      const audioResult = await sendManualAudio({
+        phoneNumberId: params.phoneNumberId,
+        waId: params.waId,
+        actor,
+        fileName: preparedFile.originalname,
+        mimeType: preparedFile.mimetype,
+        base64: preparedFile.buffer.toString('base64')
+      }) as { media_id?: string; message_id?: string };
+
+      mediaId = audioResult.media_id ?? `n8n-audio-${Date.now()}`;
+      messageId = audioResult.message_id ?? `wamid.portal.audio.${Date.now()}`;
     } else {
       const uploadResult = await uploadWhatsAppMedia({
         phoneNumberId: params.phoneNumberId,

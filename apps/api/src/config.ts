@@ -31,6 +31,7 @@ const schema = z.object({
   PGSSL: booleanFromString,
   N8N_SEND_URL: z.string().url().optional().or(z.literal('')),
   N8N_DENTAL_SEND_URL: z.string().url().optional().or(z.literal('')),
+  N8N_AUDIO_SEND_URL: z.string().url().optional().or(z.literal('')),
   N8N_BOT_URL: z.string().url().optional().or(z.literal('')),
   N8N_READ_URL: z.string().url().optional().or(z.literal('')),
   N8N_PORTAL_KEY: z.string().optional(),

@@ -40,6 +40,25 @@ export function sendManualMessage(input: {
   });
 }
 
+export function sendManualAudio(input: {
+  phoneNumberId: string;
+  waId: string;
+  actor: string;
+  fileName: string;
+  mimeType: string;
+  base64: string;
+}) {
+  const url = config.N8N_AUDIO_SEND_URL || config.N8N_SEND_URL;
+  return callN8n(url || undefined, {
+    phone_number_id: input.phoneNumberId,
+    wa_id: input.waId,
+    usuario: input.actor,
+    file_name: input.fileName,
+    mime_type: input.mimeType,
+    audio_base64: input.base64
+  });
+}
+
 export function updateBotViaN8n(input: {
   phoneNumberId: string;
   waId: string;
