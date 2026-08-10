@@ -11,24 +11,45 @@ type PendingAttachment = {
 };
 
 async function convertImageToSticker(file: File) {
-  if (file.type === 'image/webp') return file;
-
   const bitmap = await createImageBitmap(file);
-  const maxSize = 512;
-  const scale = Math.min(maxSize / bitmap.width, maxSize / bitmap.height, 1);
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('No pude preparar el sticker en este navegador.');
-  context.clearRect(0, 0, width, height);
-  context.drawImage(bitmap, 0, 0, width, height);
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.92));
-  bitmap.close();
-  if (!blob) throw new Error('No pude convertir la imagen a sticker.');
-  return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'sticker'}.webp`, { type: 'image/webp' });
+
+  const exportWebp = async (edge: number, quality: number) => {
+    const scale = Math.min(edge / bitmap.width, edge / bitmap.height, 1);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.width = width;
+    canvas.height = height;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(bitmap, 0, 0, width, height);
+    return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+  };
+
+  try {
+    const limits = [
+      { edge: 512, quality: 0.9 },
+      { edge: 512, quality: 0.82 },
+      { edge: 512, quality: 0.72 },
+      { edge: 460, quality: 0.72 },
+      { edge: 420, quality: 0.64 },
+      { edge: 384, quality: 0.58 }
+    ];
+
+    for (const option of limits) {
+      const blob = await exportWebp(option.edge, option.quality);
+      if (blob && blob.size <= 100 * 1024) {
+        return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'sticker'}.webp`, {
+          type: 'image/webp'
+        });
+      }
+    }
+
+    throw new Error('El archivo es muy pesado para sticker. Usa una imagen mas simple o pequena.');
+  } finally {
+    bitmap.close();
+  }
 }
 
 function StatusMark({ status }: { status: string }) {
