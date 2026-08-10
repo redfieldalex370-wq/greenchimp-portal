@@ -10,48 +10,6 @@ type PendingAttachment = {
   previewUrl: string;
 };
 
-async function convertImageToSticker(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('No pude preparar el sticker en este navegador.');
-
-  const exportWebp = async (edge: number, quality: number) => {
-    const scale = Math.min(edge / bitmap.width, edge / bitmap.height, 1);
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.width = width;
-    canvas.height = height;
-    context.clearRect(0, 0, width, height);
-    context.drawImage(bitmap, 0, 0, width, height);
-    return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
-  };
-
-  try {
-    const limits = [
-      { edge: 512, quality: 0.9 },
-      { edge: 512, quality: 0.82 },
-      { edge: 512, quality: 0.72 },
-      { edge: 460, quality: 0.72 },
-      { edge: 420, quality: 0.64 },
-      { edge: 384, quality: 0.58 }
-    ];
-
-    for (const option of limits) {
-      const blob = await exportWebp(option.edge, option.quality);
-      if (blob && blob.size <= 100 * 1024) {
-        return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'sticker'}.webp`, {
-          type: 'image/webp'
-        });
-      }
-    }
-
-    throw new Error('El archivo es muy pesado para sticker. Usa una imagen mas simple o pequena.');
-  } finally {
-    bitmap.close();
-  }
-}
-
 function StatusMark({ status }: { status: string }) {
   if (status === 'failed') return <span className="status-mark status-mark--error">!</span>;
   if (status === 'read') return <span className="status-mark status-mark--read">{'\u2713\u2713'}</span>;
@@ -238,12 +196,14 @@ export function MessageThread({
     if (!file) return;
 
     try {
+      if (kind === 'sticker' && file.type !== 'image/webp') {
+        throw new Error('Por ahora los stickers solo aceptan archivos WEBP.');
+      }
       clearAttachment();
-      const finalFile = kind === 'sticker' ? await convertImageToSticker(file) : file;
       setPendingAttachment({
-        file: finalFile,
+        file,
         kind,
-        previewUrl: URL.createObjectURL(finalFile)
+        previewUrl: URL.createObjectURL(file)
       });
       setAttachmentMenuOpen(false);
       setStickerPickerOpen(false);
@@ -263,11 +223,16 @@ export function MessageThread({
       clearAttachment();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-        ? 'audio/ogg;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+          ? 'audio/ogg;codecs=opus'
           : '';
+
+      if (!mimeType) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('Tu navegador solo graba en un formato que WhatsApp no acepta. Prueba desde otro navegador.');
+      }
 
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recordingChunksRef.current = [];
@@ -452,7 +417,7 @@ export function MessageThread({
             <input
               ref={stickerInputRef}
               type="file"
-              accept="image/webp,image/png,image/jpeg"
+              accept="image/webp"
               onChange={(event) => void selectAttachment('sticker', event)}
               hidden
             />

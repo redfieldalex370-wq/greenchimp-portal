@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import multer from 'multer';
-import sharp from 'sharp';
 import { z } from 'zod';
 import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
@@ -36,38 +35,18 @@ async function prepareOutgoingFile(input: {
   type: 'image' | 'audio' | 'video' | 'sticker';
 }): Promise<Express.Multer.File> {
   if (input.type === 'sticker') {
-    const webpBuffer = await sharp(input.file.buffer)
-      .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
+    if (input.file.mimetype !== 'image/webp') {
+      throw Object.assign(new Error('Por ahora los stickers solo aceptan archivos WEBP.'), { status: 400 });
+    }
 
-    if (webpBuffer.byteLength > 100 * 1024) {
-      const compactBuffer = await sharp(input.file.buffer)
-        .resize(384, 384, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 64 })
-        .toBuffer();
-
-      if (compactBuffer.byteLength > 100 * 1024) {
-        throw Object.assign(new Error('El sticker sigue siendo muy pesado. Usa una imagen mas simple o pequena.'), {
-          status: 400
-        });
-      }
-
-      return {
-        ...input.file,
-        originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'sticker'}.webp`,
-        mimetype: 'image/webp',
-        buffer: compactBuffer,
-        size: compactBuffer.byteLength
-      };
+    if (input.file.size > 100 * 1024) {
+      throw Object.assign(new Error('El sticker WEBP supera el limite permitido por WhatsApp.'), { status: 400 });
     }
 
     return {
       ...input.file,
       originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'sticker'}.webp`,
-      mimetype: 'image/webp',
-      buffer: webpBuffer,
-      size: webpBuffer.byteLength
+      mimetype: 'image/webp'
     };
   }
 
@@ -319,8 +298,8 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
       return;
     }
-    if (input.type === 'sticker' && !file.mimetype.startsWith('image/')) {
-      res.status(400).json({ ok: false, error: 'El sticker debe ser una imagen.' });
+    if (input.type === 'sticker' && file.mimetype !== 'image/webp') {
+      res.status(400).json({ ok: false, error: 'Por ahora los stickers solo aceptan archivos WEBP.' });
       return;
     }
 
