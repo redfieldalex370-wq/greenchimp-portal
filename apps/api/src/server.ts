@@ -253,15 +253,16 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       res.status(400).json({ ok: false, error: 'El archivo debe ser audio.' });
       return;
     }
-    if (input.type === 'video' && !file.mimetype.startsWith('video/')) {
-      res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
-      return;
-    }
-    if (input.type === 'sticker' && file.mimetype !== 'image/webp') {
-      res.status(400).json({ ok: false, error: 'El sticker debe ser WEBP. Para PNG o JPG usa la opcion Imagen.' });
-      return;
-    }
-
+      if (input.type === 'video' && !file.mimetype.startsWith('video/')) {
+        res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
+        return;
+      }
+      if (input.type === 'sticker' && !file.mimetype.startsWith('image/')) {
+        res.status(400).json({ ok: false, error: 'El sticker debe ser una imagen.' });
+        return;
+      }
+      const outboundType = input.type === 'sticker' && file.mimetype !== 'image/webp' ? 'image' : input.type;
+  
     const actor = res.locals.user.name as string;
     let mediaId: string;
     let messageId: string;
@@ -276,22 +277,22 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       });
       mediaId = uploadResult.id;
       const sendResult = await sendWhatsAppMedia({
-        phoneNumberId: params.phoneNumberId,
-        waId: params.waId,
-        mediaId,
-        kind: input.type,
-        caption: input.caption
-      });
+          phoneNumberId: params.phoneNumberId,
+          waId: params.waId,
+          mediaId,
+          kind: outboundType,
+          caption: input.caption
+        });
       messageId = sendResult.messages?.[0]?.id ?? `wamid.portal.media.${Date.now()}`;
     }
 
     const message = await addOutgoingMediaMessage({
       phoneNumberId: params.phoneNumberId,
       waId: params.waId,
-      actor,
-      type: input.type,
-      mediaId,
-      messageId,
+        actor,
+        type: outboundType,
+        mediaId,
+        messageId,
       caption: input.caption
     });
 

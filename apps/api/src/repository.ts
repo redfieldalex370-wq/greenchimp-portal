@@ -177,6 +177,7 @@ export async function addOutgoingMediaMessage(input: {
   messageId: string;
   caption: string;
 }): Promise<Message | null> {
+  const storedText = input.caption || '';
   if (config.DEMO_MODE) {
     const message: Message = {
       id: `demo-${Date.now()}`,
@@ -186,7 +187,7 @@ export async function addOutgoingMediaMessage(input: {
       direccion: 'out',
       autor: input.actor,
       tipo: input.type,
-      texto: input.caption,
+      texto: storedText,
       media_id: input.mediaId,
       estado: 'sent',
       creado_en: new Date().toISOString()
@@ -207,7 +208,7 @@ export async function addOutgoingMediaMessage(input: {
   const rows = await query<Message>(
     `INSERT INTO public.wa_mensajes
        (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-     VALUES ($1, $2, 'out', $3, $4, NULLIF($5, ''), $6, $7, 'sent', NOW())
+     VALUES ($1, $2, 'out', $3, $4, $5, $6, $7, 'sent', NOW())
      ON CONFLICT (message_id) DO UPDATE
        SET estado = EXCLUDED.estado,
            media_id = EXCLUDED.media_id,
@@ -223,7 +224,7 @@ export async function addOutgoingMediaMessage(input: {
                media_id,
                estado,
                creado_en`,
-    [input.phoneNumberId, input.waId, input.actor, input.type, input.caption, input.mediaId, input.messageId]
+    [input.phoneNumberId, input.waId, input.actor, input.type, storedText, input.mediaId, input.messageId]
   );
   await query(
     `UPDATE public.wa_conversaciones
@@ -233,7 +234,7 @@ export async function addOutgoingMediaMessage(input: {
             pausado_en = NOW(),
             pausado_por = $5
       WHERE phone_number_id = $1 AND wa_id = $2`,
-    [input.phoneNumberId, input.waId, input.caption, input.type, input.actor]
+    [input.phoneNumberId, input.waId, storedText, input.type, input.actor]
   );
   return rows[0] ?? null;
 }

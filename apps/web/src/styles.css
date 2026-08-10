@@ -117,12 +117,12 @@ button { color: inherit; }
 .attachment-popover button { width: 100%; border: 0; border-radius: 9px; background: transparent; color: var(--text); display: flex; align-items: center; gap: 10px; padding: 10px; text-align: left; cursor: pointer; }
 .attachment-popover button:hover { background: #1b241f; }
 .attachment-popover span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: rgba(182,255,59,.11); color: var(--lime); font-size: 11px; font-weight: 900; }
-.attachment-preview { position: relative; width: fit-content; max-width: min(100%, 520px); border: 1px solid #344139; border-radius: 14px; background: #101713; padding: 8px; }
+.attachment-preview { position: relative; width: fit-content; max-width: min(100%, 380px); border: 1px solid #344139; border-radius: 14px; background: #101713; padding: 7px; }
 .attachment-preview__media { display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: #0d120f; }
-.attachment-preview__media img, .attachment-preview__media video { display: block; max-width: min(62vw, 500px); max-height: 330px; object-fit: contain; }
+.attachment-preview__media img, .attachment-preview__media video { display: block; max-width: min(54vw, 360px); max-height: 230px; object-fit: contain; }
 .attachment-preview--sticker { border: 0; background: transparent; padding: 0; }
 .attachment-preview--sticker .attachment-preview__media { background: transparent; }
-.attachment-preview--sticker .attachment-preview__media img { max-width: 220px; max-height: 220px; }
+.attachment-preview--sticker .attachment-preview__media img { max-width: 170px; max-height: 170px; }
 .attachment-preview--audio { width: min(100%, 390px); }
 .attachment-preview--audio .attachment-preview__media { background: #1e2722; padding: 9px; }
 .attachment-preview__media audio { width: min(360px, 100%); accent-color: var(--lime); }

@@ -320,7 +320,7 @@ export function MessageThread({
             <input
               ref={stickerInputRef}
               type="file"
-              accept="image/webp"
+              accept="image/webp,image/png,image/jpeg"
               onChange={(event) => selectAttachment('sticker', event)}
               hidden
             />
