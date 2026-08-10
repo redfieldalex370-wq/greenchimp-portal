@@ -261,9 +261,8 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
         res.status(400).json({ ok: false, error: 'El sticker debe ser una imagen.' });
         return;
       }
-      const outboundType = input.type === 'sticker' && file.mimetype !== 'image/webp' ? 'image' : input.type;
-  
-    const actor = res.locals.user.name as string;
+
+      const actor = res.locals.user.name as string;
     let mediaId: string;
     let messageId: string;
 
@@ -280,7 +279,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
           phoneNumberId: params.phoneNumberId,
           waId: params.waId,
           mediaId,
-          kind: outboundType,
+          kind: input.type,
           caption: input.caption
         });
       messageId = sendResult.messages?.[0]?.id ?? `wamid.portal.media.${Date.now()}`;
@@ -290,7 +289,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
       phoneNumberId: params.phoneNumberId,
       waId: params.waId,
         actor,
-        type: outboundType,
+        type: input.type,
         mediaId,
         messageId,
       caption: input.caption

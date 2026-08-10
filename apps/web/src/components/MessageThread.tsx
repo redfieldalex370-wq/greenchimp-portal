@@ -1,37 +1,94 @@
-import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import type { Conversation, Message } from '../types';
 import { clockTime, windowCountdown } from '../utils';
 
+type PendingAttachmentKind = 'image' | 'audio' | 'video' | 'sticker';
+
 type PendingAttachment = {
   file: File;
-  kind: 'image' | 'audio' | 'video' | 'sticker';
+  kind: PendingAttachmentKind;
   previewUrl: string;
 };
 
+async function convertImageToSticker(file: File) {
+  if (file.type === 'image/webp') return file;
+
+  const bitmap = await createImageBitmap(file);
+  const maxSize = 512;
+  const scale = Math.min(maxSize / bitmap.width, maxSize / bitmap.height, 1);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No pude preparar el sticker en este navegador.');
+  context.clearRect(0, 0, width, height);
+  context.drawImage(bitmap, 0, 0, width, height);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.92));
+  bitmap.close();
+  if (!blob) throw new Error('No pude convertir la imagen a sticker.');
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'sticker'}.webp`, { type: 'image/webp' });
+}
+
 function StatusMark({ status }: { status: string }) {
   if (status === 'failed') return <span className="status-mark status-mark--error">!</span>;
-  if (status === 'read') return <span className="status-mark status-mark--read">✓✓</span>;
-  if (status === 'delivered') return <span className="status-mark">✓✓</span>;
-  return <span className="status-mark">✓</span>;
+  if (status === 'read') return <span className="status-mark status-mark--read">{'\u2713\u2713'}</span>;
+  if (status === 'delivered') return <span className="status-mark">{'\u2713\u2713'}</span>;
+  return <span className="status-mark">{'\u2713'}</span>;
+}
+
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.4 20.6 21 12 3.4 3.4l.2 6.5 9.4 2.1-9.4 2.1-.2 6.5Z" fill="currentColor" />
+    </svg>
+  );
 }
 
 function MediaContent({ message }: { message: Message }) {
-  if (!message.media_id || !message.id) return <p>{message.texto || 'Contenido multimedia no disponible'}</p>;
+  if (!message.media_id || !message.id) {
+    return <p>{message.texto || 'Contenido multimedia no disponible'}</p>;
+  }
 
   const url = `/api/messages/${encodeURIComponent(message.id)}/media`;
   const type = message.tipo.toLowerCase();
 
   if (type === 'image' || type === 'sticker') {
-    return <img className={`message-media message-media--${type}`} src={url} alt={message.texto || (type === 'sticker' ? 'Sticker de WhatsApp' : 'Imagen de WhatsApp')} loading="lazy" />;
+    return (
+      <img
+        className={`message-media message-media--${type}`}
+        src={url}
+        alt={message.texto || (type === 'sticker' ? 'Sticker de WhatsApp' : 'Imagen de WhatsApp')}
+        loading="lazy"
+      />
+    );
   }
+
   if (type === 'audio' || type === 'voice') {
     return <audio className="message-media message-media--audio" src={url} controls preload="metadata" />;
   }
+
   if (type === 'video') {
     return <video className="message-media message-media--video" src={url} controls preload="metadata" />;
   }
 
-  return <a className="media-download" href={url} target="_blank" rel="noreferrer">Abrir o descargar archivo</a>;
+  return (
+    <a className="media-download" href={url} target="_blank" rel="noreferrer">
+      Abrir o descargar archivo
+    </a>
+  );
 }
 
 export function MessageThread({
@@ -73,8 +130,17 @@ export function MessageThread({
   useEffect(() => {
     return () => {
       if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
     };
   }, [pendingAttachment]);
+
+  function clearAttachment() {
+    setPendingAttachment((current) => {
+      if (current) URL.revokeObjectURL(current.previewUrl);
+      return null;
+    });
+  }
 
   useEffect(() => {
     setAttachmentMenuOpen(false);
@@ -82,22 +148,39 @@ export function MessageThread({
     clearAttachment();
   }, [conversation?.wa_id]);
 
-  const safeMessages = Array.isArray(messages)
-    ? messages.filter((message): message is Message => Boolean(message?.tipo && (message.id || message.message_id)))
-    : [];
+  const safeMessages = useMemo(
+    () =>
+      Array.isArray(messages)
+        ? messages.filter((message): message is Message => Boolean(message?.tipo && (message.id || message.message_id)))
+        : [],
+    [messages]
+  );
+
+  const recentStickers = useMemo(
+    () =>
+      safeMessages
+        .filter((message) => message.tipo.toLowerCase() === 'sticker' && message.media_id && message.id)
+        .filter((message, index, list) => list.findIndex((item) => item.media_id === message.media_id) === index)
+        .slice(-18)
+        .reverse(),
+    [safeMessages]
+  );
 
   if (!conversation) {
     return (
       <section className="thread-column thread-column--empty">
         <div className="brand-orbit">GC</div>
-        <h2>Selecciona una conversación</h2>
-        <p>El historial aparecerá aquí, sin abrir veinte pestañas ni invocar al pulpo de los webhooks.</p>
+        <h2>Selecciona una conversacion</h2>
+        <p>El historial aparecera aqui.</p>
       </section>
     );
   }
 
+  const activeConversation = conversation;
+
   async function submit(event?: FormEvent) {
     event?.preventDefault();
+
     if (pendingAttachment) {
       const caption = draft.trim();
       try {
@@ -109,8 +192,10 @@ export function MessageThread({
       }
       return;
     }
+
     const text = draft.trim();
-    if (!text || sending || !conversation?.ventana_abierta) return;
+    if (!text || sending || !activeConversation.ventana_abierta) return;
+
     setDraft('');
     try {
       await onSend(text);
@@ -126,22 +211,24 @@ export function MessageThread({
     }
   }
 
-  function clearAttachment() {
-    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl);
-    setPendingAttachment(null);
-  }
-
-  function selectAttachment(kind: PendingAttachment['kind'], event: ChangeEvent<HTMLInputElement>) {
+  async function selectAttachment(kind: PendingAttachmentKind, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    clearAttachment();
-    setPendingAttachment({
-      file,
-      kind,
-      previewUrl: URL.createObjectURL(file)
-    });
-    setAttachmentMenuOpen(false);
+
+    try {
+      clearAttachment();
+      const finalFile = kind === 'sticker' ? await convertImageToSticker(file) : file;
+      setPendingAttachment({
+        file: finalFile,
+        kind,
+        previewUrl: URL.createObjectURL(finalFile)
+      });
+      setAttachmentMenuOpen(false);
+      setStickerPickerOpen(false);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'No se pudo preparar el archivo.');
+    }
   }
 
   async function startAudioRecording() {
@@ -149,21 +236,27 @@ export function MessageThread({
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
         throw new Error('Este navegador no permite grabar audio desde la pagina.');
       }
+
       setAttachmentMenuOpen(false);
+      setStickerPickerOpen(false);
       clearAttachment();
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
         ? 'audio/ogg;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : '';
+
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recordingChunksRef.current = [];
       recordingStreamRef.current = stream;
       recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+
+      recorder.ondataavailable = (recordEvent) => {
+        if (recordEvent.data.size > 0) recordingChunksRef.current.push(recordEvent.data);
       };
+
       recorder.onstop = () => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         const extension = blob.type.includes('ogg') ? 'ogg' : 'webm';
@@ -178,6 +271,7 @@ export function MessageThread({
         recorderRef.current = null;
         setRecording(false);
       };
+
       recorder.start();
       setRecording(true);
     } catch (error) {
@@ -194,16 +288,10 @@ export function MessageThread({
   }
 
   async function sendExistingSticker(mediaId: string) {
-    if (!conversation?.ventana_abierta || sending) return;
+    if (!activeConversation.ventana_abierta || sending) return;
     setStickerPickerOpen(false);
     await onSendMediaById('sticker', mediaId, '');
   }
-
-  const recentStickers = safeMessages
-    .filter((message) => message.tipo.toLowerCase() === 'sticker' && message.media_id && message.id)
-    .filter((message, index, list) => list.findIndex((item) => item.media_id === message.media_id) === index)
-    .slice(-18)
-    .reverse();
 
   return (
     <section className="thread-column">
@@ -213,7 +301,7 @@ export function MessageThread({
           <p>{conversation.wa_id}</p>
         </div>
         <span className={`window-chip ${conversation.ventana_abierta ? '' : 'window-chip--closed'}`}>
-          ◷ {windowCountdown(conversation.ventana_expira)}
+          {windowCountdown(conversation.ventana_expira)}
         </span>
       </header>
 
@@ -221,23 +309,28 @@ export function MessageThread({
         {safeMessages.map((message) => {
           const mediaType = message.tipo.toLowerCase();
           return (
-          <article
-            key={message.id || message.message_id}
-            className={`message-row ${message.direccion === 'out' ? 'message-row--out' : ''}`}
-          >
-            <div className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''} ${message.tipo !== 'text' ? `message-bubble--${mediaType}` : ''}`}>
-              {message.tipo === 'text' ? <p>{message.texto}</p> : <MediaContent message={message} />}
-              {message.tipo !== 'text' && message.texto && <p className="media-caption">{message.texto}</p>}
-              <footer>
-                {message.direccion === 'out' && <span>{message.autor}</span>}
-                <time>{clockTime(message.creado_en)}</time>
-                {message.direccion === 'out' && <StatusMark status={message.estado} />}
-              </footer>
-            </div>
-          </article>
+            <article
+              key={message.id || message.message_id}
+              className={`message-row ${message.direccion === 'out' ? 'message-row--out' : ''}`}
+            >
+              <div
+                className={`message-bubble ${message.direccion === 'out' ? 'message-bubble--out' : ''} ${
+                  message.tipo !== 'text' ? `message-bubble--${mediaType}` : ''
+                }`}
+              >
+                {message.tipo === 'text' ? <p>{message.texto}</p> : <MediaContent message={message} />}
+                {message.tipo !== 'text' && message.texto && <p className="media-caption">{message.texto}</p>}
+                <footer>
+                  {message.direccion === 'out' && <span>{message.autor}</span>}
+                  <time>{clockTime(message.creado_en)}</time>
+                  {message.direccion === 'out' && <StatusMark status={message.estado} />}
+                </footer>
+              </div>
+            </article>
           );
         })}
-        {!loading && safeMessages.length === 0 && <div className="empty-thread">Todavía no hay mensajes guardados.</div>}
+
+        {!loading && safeMessages.length === 0 && <div className="empty-thread">Todavia no hay mensajes guardados.</div>}
         <div ref={bottomRef} />
       </div>
 
@@ -245,17 +338,28 @@ export function MessageThread({
         {pendingAttachment && (
           <div className={`attachment-preview attachment-preview--${pendingAttachment.kind}`}>
             <div className="attachment-preview__media">
-              {pendingAttachment.kind === 'audio'
-                ? <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
-                : pendingAttachment.kind === 'video'
-                  ? <video src={pendingAttachment.previewUrl} controls preload="metadata" />
-                : <img src={pendingAttachment.previewUrl} alt="Sticker seleccionado" />}
+              {pendingAttachment.kind === 'audio' ? (
+                <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
+              ) : pendingAttachment.kind === 'video' ? (
+                <video src={pendingAttachment.previewUrl} controls preload="metadata" />
+              ) : (
+                <img
+                  src={pendingAttachment.previewUrl}
+                  alt={pendingAttachment.kind === 'sticker' ? 'Sticker seleccionado' : 'Archivo seleccionado'}
+                />
+              )}
             </div>
-            <button type="button" className="attachment-preview__remove" onClick={clearAttachment} aria-label="Quitar archivo">
+            <button
+              type="button"
+              className="attachment-preview__remove"
+              onClick={clearAttachment}
+              aria-label="Quitar archivo"
+            >
               x
             </button>
           </div>
         )}
+
         <div className="composer-row">
           <div className="attachment-menu">
             <button
@@ -268,29 +372,30 @@ export function MessageThread({
             >
               +
             </button>
+
             {attachmentMenuOpen && (
               <div className="attachment-popover">
                 <button type="button" onClick={() => imageInputRef.current?.click()}>
                   <span>I</span>
                   Imagen
                 </button>
-                <button type="button" onClick={() => void startAudioRecording()}>
-                  <span>A</span>
-                  Audio
-                </button>
                 <button type="button" onClick={() => videoInputRef.current?.click()}>
                   <span>V</span>
                   Video
                 </button>
-                <button type="button" onClick={() => {
-                  setStickerPickerOpen((open) => !open);
-                  setAttachmentMenuOpen(false);
-                }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStickerPickerOpen((open) => !open);
+                    setAttachmentMenuOpen(false);
+                  }}
+                >
                   <span>S</span>
                   Sticker
                 </button>
               </div>
             )}
+
             {stickerPickerOpen && (
               <div className="sticker-picker">
                 <div className="sticker-picker__grid">
@@ -304,50 +409,67 @@ export function MessageThread({
                       <img src={`/api/messages/${encodeURIComponent(message.id)}/media`} alt="" loading="lazy" />
                     </button>
                   ))}
-                  <button type="button" className="sticker-picker__upload" onClick={() => stickerInputRef.current?.click()}>
+                  <button
+                    type="button"
+                    className="sticker-picker__upload"
+                    onClick={() => stickerInputRef.current?.click()}
+                    aria-label="Subir sticker"
+                  >
                     +
                   </button>
                 </div>
               </div>
             )}
+
             <input
               ref={imageInputRef}
               type="file"
               accept="image/png,image/jpeg"
-              onChange={(event) => selectAttachment('image', event)}
+              onChange={(event) => void selectAttachment('image', event)}
               hidden
             />
             <input
               ref={stickerInputRef}
               type="file"
               accept="image/webp,image/png,image/jpeg"
-              onChange={(event) => selectAttachment('sticker', event)}
+              onChange={(event) => void selectAttachment('sticker', event)}
               hidden
             />
             <input
               ref={videoInputRef}
               type="file"
               accept="video/*"
-              onChange={(event) => selectAttachment('video', event)}
+              onChange={(event) => void selectAttachment('video', event)}
               hidden
             />
           </div>
-        {recording && (
-          <button type="button" className="recording-chip" onClick={stopAudioRecording}>
-            Grabando... tocar para detener
+
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={keyDown}
+            placeholder={conversation.ventana_abierta ? 'Escribe un mensaje...' : 'Ventana cerrada - se requiere plantilla'}
+            disabled={!conversation.ventana_abierta || sending}
+            rows={1}
+          />
+
+          <button
+            type="button"
+            className={`mic-button ${recording ? 'mic-button--recording' : ''}`}
+            onClick={() => void (recording ? stopAudioRecording() : startAudioRecording())}
+            disabled={!conversation.ventana_abierta || sending}
+            aria-label={recording ? 'Detener grabacion' : 'Grabar audio'}
+          >
+            {recording ? <span className="mic-button__stop" aria-hidden="true" /> : <MicIcon />}
           </button>
-        )}
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={keyDown}
-          placeholder={conversation.ventana_abierta ? 'Escribe un mensaje…' : 'Ventana cerrada · se requiere plantilla'}
-          disabled={!conversation.ventana_abierta || sending}
-          rows={1}
-        />
-        <button className="send-button" disabled={(!draft.trim() && !pendingAttachment) || !conversation.ventana_abierta || sending} aria-label="Enviar mensaje">
-          {sending ? '…' : '➤'}
-        </button>
+
+          <button
+            className="send-button"
+            disabled={(!draft.trim() && !pendingAttachment) || !conversation.ventana_abierta || sending}
+            aria-label="Enviar mensaje"
+          >
+            <SendIcon />
+          </button>
         </div>
       </form>
     </section>

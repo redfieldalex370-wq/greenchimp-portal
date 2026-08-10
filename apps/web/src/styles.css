@@ -109,10 +109,17 @@ button { color: inherit; }
 .composer textarea { resize: none; max-height: 130px; flex: 1; min-width: 0; border: 1px solid #303c34; background: #151b17; color: var(--text); border-radius: 13px; outline: 0; padding: 12px 13px; line-height: 1.4; }
 .composer textarea:focus { border-color: #5a6d4e; box-shadow: 0 0 0 3px rgba(182,255,59,.05); }
 .composer textarea:disabled { opacity: .56; cursor: not-allowed; }
-.composer .send-button, .attachment-trigger { width: 42px; height: 42px; flex: 0 0 auto; border: 0; border-radius: 12px; background: var(--lime); color: #12170f; font-weight: 900; cursor: pointer; }
-.composer .send-button:disabled, .attachment-trigger:disabled { background: #313a34; color: #667069; cursor: not-allowed; }
+.composer .send-button, .attachment-trigger, .mic-button { width: 42px; height: 42px; flex: 0 0 auto; border: 0; border-radius: 12px; background: var(--lime); color: #12170f; font-weight: 900; cursor: pointer; }
+.composer .send-button:disabled, .attachment-trigger:disabled, .mic-button:disabled { background: #313a34; color: #667069; cursor: not-allowed; }
+.composer .send-button, .mic-button { display: grid; place-items: center; }
+.composer .send-button svg, .mic-button svg { width: 18px; height: 18px; display: block; }
 .attachment-menu { position: relative; flex: 0 0 auto; }
 .attachment-trigger { background: #202923; color: var(--lime); border: 1px solid #344139; font-size: 20px; line-height: 1; }
+.mic-button { background: #202923; color: var(--lime); border: 1px solid #344139; }
+.mic-button:hover:not(:disabled) { border-color: #4e6154; background: #253029; }
+.mic-button--recording { background: #3a1f1f; border-color: #8c4a4a; color: #ffb0b0; }
+.mic-button--recording:hover:not(:disabled) { background: #492424; }
+.mic-button__stop { width: 12px; height: 12px; border-radius: 3px; background: currentColor; display: block; }
 .attachment-popover { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 4; width: 178px; padding: 7px; border: 1px solid #344139; border-radius: 13px; background: #111713; box-shadow: var(--shadow); display: grid; gap: 6px; }
 .attachment-popover button { width: 100%; border: 0; border-radius: 9px; background: transparent; color: var(--text); display: flex; align-items: center; gap: 10px; padding: 10px; text-align: left; cursor: pointer; }
 .attachment-popover button:hover { background: #1b241f; }
@@ -133,7 +140,6 @@ button { color: inherit; }
 .sticker-picker__grid button:hover { border-color: rgba(182,255,59,.5); background: #172018; }
 .sticker-picker__grid img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .sticker-picker__upload { color: var(--lime); font-size: 22px; font-weight: 900; }
-.recording-chip { flex: 0 0 auto; height: 42px; border: 1px solid #5f4630; border-radius: 12px; background: #261812; color: #ffc49c; padding: 0 13px; cursor: pointer; font-size: 12px; font-weight: 800; }
 
 .contact-identity { display: grid; justify-items: center; text-align: center; padding: 10px 0 22px; border-bottom: 1px solid var(--line); }
 .contact-identity h3 { margin: 12px 0 4px; font-size: 16px; }
