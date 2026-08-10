@@ -1,9 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import express from 'express';
 import helmet from 'helmet';
 import multer from 'multer';
@@ -22,7 +19,7 @@ import {
   setBotActive
 } from './repository.js';
 import { sendManualMessage } from './n8n.js';
-import { sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
+import { normalizeUploadMimeType, sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
 
 const app = express();
 const conversationParamsSchema = z.object({
@@ -33,76 +30,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024, files: 1 }
 });
-
-async function transcodeAudioForWhatsApp(file: Express.Multer.File) {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'gc-audio-'));
-  const inputPath = path.join(tempDir, `${randomUUID()}.input`);
-  const outputPath = path.join(tempDir, `${randomUUID()}.ogg`);
-
-  try {
-    await fs.promises.writeFile(inputPath, file.buffer);
-
-    await new Promise<void>((resolve, reject) => {
-      const ffmpeg = spawn(
-        'ffmpeg',
-        [
-          '-y',
-          '-i',
-          inputPath,
-          '-vn',
-          '-c:a',
-          'libopus',
-          '-b:a',
-          '32k',
-          '-ac',
-          '1',
-          '-ar',
-          '48000',
-          outputPath
-        ],
-        { stdio: ['ignore', 'ignore', 'pipe'] }
-      );
-
-      let stderr = '';
-      ffmpeg.stderr.on('data', (chunk) => {
-        stderr += chunk.toString();
-      });
-
-      ffmpeg.on('error', (error) => {
-        reject(
-          Object.assign(new Error(`No se pudo ejecutar ffmpeg: ${error.message}`), {
-            status: 503
-          })
-        );
-      });
-
-      ffmpeg.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-
-        reject(
-          Object.assign(
-            new Error(stderr.trim() || 'No se pudo convertir el audio a un formato compatible con WhatsApp.'),
-            { status: 400 }
-          )
-        );
-      });
-    });
-
-    const convertedBuffer = await fs.promises.readFile(outputPath);
-    return {
-      ...file,
-      originalname: `${file.originalname.replace(/\.[^.]+$/, '') || 'audio'}.ogg`,
-      mimetype: 'audio/ogg',
-      buffer: convertedBuffer,
-      size: convertedBuffer.byteLength
-    } satisfies Express.Multer.File;
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-  }
-}
 
 async function prepareOutgoingFile(input: {
   file: Express.Multer.File;
@@ -157,7 +84,21 @@ async function prepareOutgoingFile(input: {
   }
 
   if (input.type === 'audio') {
-    return transcodeAudioForWhatsApp(input.file);
+    const normalizedMimeType = normalizeUploadMimeType(input.file.mimetype);
+    const extension =
+      normalizedMimeType === 'audio/ogg'
+        ? 'ogg'
+        : normalizedMimeType === 'audio/mp4'
+          ? 'm4a'
+          : normalizedMimeType === 'audio/webm'
+            ? 'webm'
+            : input.file.originalname.split('.').pop() || 'audio';
+
+    return {
+      ...input.file,
+      originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'audio'}.${extension}`,
+      mimetype: normalizedMimeType
+    };
   }
 
   return input.file;

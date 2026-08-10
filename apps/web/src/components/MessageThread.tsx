@@ -1,4 +1,6 @@
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import type { Conversation, Message } from '../types';
 import { clockTime, windowCountdown } from '../utils';
 
@@ -9,6 +11,62 @@ type PendingAttachment = {
   kind: PendingAttachmentKind;
   previewUrl: string;
 };
+
+let ffmpegInstance: FFmpeg | null = null;
+let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
+
+async function getBrowserFfmpeg() {
+  if (ffmpegInstance) return ffmpegInstance;
+  if (ffmpegLoadPromise) return ffmpegLoadPromise;
+
+  ffmpegLoadPromise = (async () => {
+    const ffmpeg = new FFmpeg();
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+    });
+    ffmpegInstance = ffmpeg;
+    return ffmpeg;
+  })();
+
+  return ffmpegLoadPromise;
+}
+
+async function convertRecordedAudioForWhatsApp(file: File) {
+  const ffmpeg = await getBrowserFfmpeg();
+  const sourceExtension = file.type.includes('mp4') ? 'm4a' : file.type.includes('ogg') ? 'ogg' : 'webm';
+  const inputName = `input.${sourceExtension}`;
+  const outputName = 'output.ogg';
+
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  try {
+    await ffmpeg.exec([
+      '-i',
+      inputName,
+      '-vn',
+      '-c:a',
+      'libopus',
+      '-b:a',
+      '32k',
+      '-ac',
+      '1',
+      '-ar',
+      '48000',
+      outputName
+    ]);
+
+    const output = await ffmpeg.readFile(outputName);
+    const bytes = output instanceof Uint8Array ? output : new Uint8Array();
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], { type: 'audio/ogg' });
+    return new File([blob], `audio-${Date.now()}.ogg`, { type: 'audio/ogg' });
+  } finally {
+    await ffmpeg.deleteFile(inputName).catch(() => undefined);
+    await ffmpeg.deleteFile(outputName).catch(() => undefined);
+  }
+}
 
 function StatusMark({ status }: { status: string }) {
   if (status === 'failed') return <span className="status-mark status-mark--error">!</span>;
@@ -36,16 +94,11 @@ function SendIcon() {
   );
 }
 
-function isBraveBrowser() {
-  if (typeof navigator === 'undefined') return false;
-  const braveFlag = (navigator as Navigator & { brave?: unknown }).brave;
-  return typeof braveFlag !== 'undefined';
-}
-
 function preferredAudioMimeType() {
   if (typeof MediaRecorder === 'undefined') return '';
   if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
   if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) return 'audio/ogg;codecs=opus';
+  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
   return '';
 }
 
@@ -115,7 +168,7 @@ export function MessageThread({
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const audioMimeType = preferredAudioMimeType();
-  const canRecordAudio = !isBraveBrowser() && Boolean(audioMimeType) && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+  const canRecordAudio = Boolean(audioMimeType) && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -232,9 +285,6 @@ export function MessageThread({
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
         throw new Error('Este navegador no permite grabar audio desde la pagina.');
       }
-      if (isBraveBrowser()) {
-        throw new Error('La grabacion por microfono se desactivo en Brave. Usa Google Chrome para mandar audio.');
-      }
 
       setAttachmentMenuOpen(false);
       setStickerPickerOpen(false);
@@ -245,7 +295,7 @@ export function MessageThread({
 
       if (!mimeType) {
         stream.getTracks().forEach((track) => track.stop());
-        throw new Error('Este navegador no genera un audio compatible. Usa Google Chrome para grabar.');
+        throw new Error('Este navegador no genera un audio compatible para convertir.');
       }
 
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -257,19 +307,26 @@ export function MessageThread({
         if (recordEvent.data.size > 0) recordingChunksRef.current.push(recordEvent.data);
       };
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-        const extension = blob.type.includes('ogg') ? 'ogg' : 'webm';
-        const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
-        setPendingAttachment({
-          file,
-          kind: 'audio',
-          previewUrl: URL.createObjectURL(file)
-        });
-        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-        recordingStreamRef.current = null;
-        recorderRef.current = null;
-        setRecording(false);
+        const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+        const rawFile = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
+
+        try {
+          const convertedFile = await convertRecordedAudioForWhatsApp(rawFile);
+          setPendingAttachment({
+            file: convertedFile,
+            kind: 'audio',
+            previewUrl: URL.createObjectURL(convertedFile)
+          });
+        } catch (error) {
+          onError(error instanceof Error ? error.message : 'No se pudo convertir el audio en el navegador.');
+        } finally {
+          recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+          recordingStreamRef.current = null;
+          recorderRef.current = null;
+          setRecording(false);
+        }
       };
 
       recorder.start();
@@ -464,7 +521,7 @@ export function MessageThread({
                 ? 'Detener grabacion'
                 : canRecordAudio
                   ? 'Grabar audio'
-                  : 'La grabacion por microfono esta disponible en Google Chrome'
+                  : 'La grabacion por microfono no esta disponible en este navegador'
             }
           >
             {recording ? <span className="mic-button__stop" aria-hidden="true" /> : <MicIcon />}
