@@ -41,7 +41,8 @@ export function MessageThread({
   sending,
   onSend,
   onSendMedia,
-  onSendMediaById
+  onSendMediaById,
+  onError
 }: {
   conversation: Conversation | null;
   messages: Message[];
@@ -50,6 +51,7 @@ export function MessageThread({
   onSend: (text: string) => Promise<void>;
   onSendMedia: (type: string, file: File, caption: string) => Promise<void>;
   onSendMediaById: (type: string, mediaId: string, caption: string) => Promise<void>;
+  onError: (message: string) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
@@ -79,6 +81,10 @@ export function MessageThread({
     setStickerPickerOpen(false);
     clearAttachment();
   }, [conversation?.wa_id]);
+
+  const safeMessages = Array.isArray(messages)
+    ? messages.filter((message): message is Message => Boolean(message?.tipo && (message.id || message.message_id)))
+    : [];
 
   if (!conversation) {
     return (
@@ -139,31 +145,48 @@ export function MessageThread({
   }
 
   async function startAudioRecording() {
-    setAttachmentMenuOpen(false);
-    clearAttachment();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
-    recordingChunksRef.current = [];
-    recordingStreamRef.current = stream;
-    recorderRef.current = recorder;
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordingChunksRef.current.push(event.data);
-    };
-    recorder.onstop = () => {
-      const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-      const file = new File([blob], `audio-${Date.now()}.webm`, { type: blob.type });
-      setPendingAttachment({
-        file,
-        kind: 'audio',
-        previewUrl: URL.createObjectURL(file)
-      });
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Este navegador no permite grabar audio desde la pagina.');
+      }
+      setAttachmentMenuOpen(false);
+      clearAttachment();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingChunksRef.current = [];
+      recordingStreamRef.current = stream;
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        const extension = blob.type.includes('ogg') ? 'ogg' : 'webm';
+        const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
+        setPendingAttachment({
+          file,
+          kind: 'audio',
+          previewUrl: URL.createObjectURL(file)
+        });
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        recorderRef.current = null;
+        setRecording(false);
+      };
+      recorder.start();
+      setRecording(true);
+    } catch (error) {
       recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
       recordingStreamRef.current = null;
       recorderRef.current = null;
       setRecording(false);
-    };
-    recorder.start();
-    setRecording(true);
+      onError(error instanceof Error ? error.message : 'No se pudo iniciar la grabacion.');
+    }
   }
 
   function stopAudioRecording() {
@@ -176,7 +199,7 @@ export function MessageThread({
     await onSendMediaById('sticker', mediaId, '');
   }
 
-  const recentStickers = messages
+  const recentStickers = safeMessages
     .filter((message) => message.tipo.toLowerCase() === 'sticker' && message.media_id && message.id)
     .filter((message, index, list) => list.findIndex((item) => item.media_id === message.media_id) === index)
     .slice(-18)
@@ -195,7 +218,7 @@ export function MessageThread({
       </header>
 
       <div className="message-scroll">
-        {messages.map((message) => {
+        {safeMessages.map((message) => {
           const mediaType = message.tipo.toLowerCase();
           return (
           <article
@@ -214,7 +237,7 @@ export function MessageThread({
           </article>
           );
         })}
-        {!loading && messages.length === 0 && <div className="empty-thread">Todavía no hay mensajes guardados.</div>}
+        {!loading && safeMessages.length === 0 && <div className="empty-thread">Todavía no hay mensajes guardados.</div>}
         <div ref={bottomRef} />
       </div>
 

@@ -306,6 +306,7 @@ export default function App() {
           onSend={send}
           onSendMedia={sendMedia}
           onSendMediaById={sendMediaById}
+          onError={showToast}
         />
         <ContactPanel
           conversation={selected}
