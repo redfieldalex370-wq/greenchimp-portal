@@ -98,6 +98,11 @@ button { color: inherit; }
 .message-media--sticker { height: auto; max-height: 240px; max-width: 240px; object-fit: contain; width: auto; }
 .message-media--video { border-radius: 11px; max-height: 360px; max-width: min(420px, 100%); object-fit: contain; }
 .message-media--audio { min-width: 0; width: 100%; accent-color: var(--lime); }
+.audio-message-card { display: grid; gap: 8px; width: 100%; }
+.audio-attachment-label { display: grid; gap: 2px; justify-items: start; padding: 2px 2px 0; }
+.audio-attachment-label span { font-size: 10px; font-weight: 900; letter-spacing: .12em; color: #a9b5ad; }
+.audio-attachment-label strong { font-size: 13px; line-height: 1.1; color: var(--text); }
+.audio-attachment-label--compact strong { font-size: 12px; }
 .message-bubble--sticker footer { margin-top: 3px; padding-right: 4px; justify-content: flex-start; }
 .media-download { color: inherit; display: inline-flex; font-weight: 800; padding: 10px 12px; text-decoration: underline; }
 .media-caption { margin-top: 6px; }
@@ -131,7 +136,7 @@ button { color: inherit; }
 .attachment-preview--sticker .attachment-preview__media { background: transparent; }
 .attachment-preview--sticker .attachment-preview__media img { max-width: 170px; max-height: 170px; }
 .attachment-preview--audio { width: min(100%, 390px); }
-.attachment-preview--audio .attachment-preview__media { background: #1e2722; padding: 9px; }
+.attachment-preview--audio .attachment-preview__media { background: #1e2722; padding: 10px; }
 .attachment-preview__media audio { width: min(360px, 100%); accent-color: var(--lime); }
 .attachment-preview__remove { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border: 1px solid #425047; border-radius: 9px; background: rgba(18,25,20,.86); color: #d8e0da; cursor: pointer; }
 .sticker-picker { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 4; width: 310px; max-width: 82vw; border: 1px solid #344139; border-radius: 15px; background: #111713; box-shadow: var(--shadow); padding: 12px; }

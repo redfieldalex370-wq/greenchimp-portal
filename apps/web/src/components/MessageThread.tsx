@@ -90,6 +90,15 @@ function SendIcon() {
   );
 }
 
+function AudioAttachmentLabel({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`audio-attachment-label ${compact ? 'audio-attachment-label--compact' : ''}`}>
+      <span>AUDIO</span>
+      <strong>Audio adjunto</strong>
+    </div>
+  );
+}
+
 function preferredAudioMimeType() {
   if (typeof MediaRecorder === 'undefined') return '';
   if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
@@ -118,7 +127,12 @@ function MediaContent({ message }: { message: Message }) {
   }
 
   if (type === 'audio' || type === 'voice') {
-    return <audio className="message-media message-media--audio" src={url} controls preload="metadata" />;
+    return (
+      <div className="audio-message-card">
+        <AudioAttachmentLabel compact />
+        <audio className="message-media message-media--audio" src={url} controls preload="metadata" />
+      </div>
+    );
   }
 
   if (type === 'video') {
@@ -392,7 +406,10 @@ export function MessageThread({
           <div className={`attachment-preview attachment-preview--${pendingAttachment.kind}`}>
             <div className="attachment-preview__media">
               {pendingAttachment.kind === 'audio' ? (
-                <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
+                <div className="audio-message-card">
+                  <AudioAttachmentLabel />
+                  <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
+                </div>
               ) : pendingAttachment.kind === 'video' ? (
                 <video src={pendingAttachment.previewUrl} controls preload="metadata" />
               ) : (
