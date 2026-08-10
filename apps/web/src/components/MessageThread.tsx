@@ -64,6 +64,10 @@ async function convertRecordedAudioForWhatsApp(file: File) {
   }
 }
 
+function canSendRecordedAudioDirectly(mimeType: string) {
+  return mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/ogg') || mimeType.startsWith('audio/mpeg');
+}
+
 function StatusMark({ status }: { status: string }) {
   if (status === 'failed') return <span className="status-mark status-mark--error">!</span>;
   if (status === 'read') return <span className="status-mark status-mark--read">{'\u2713\u2713'}</span>;
@@ -323,10 +327,12 @@ export function MessageThread({
         const rawFile = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
 
         try {
-          const convertedFile = await convertRecordedAudioForWhatsApp(rawFile);
-          await onSendMedia('audio', convertedFile, '');
+          const finalFile = canSendRecordedAudioDirectly(rawFile.type)
+            ? rawFile
+            : await convertRecordedAudioForWhatsApp(rawFile);
+          await onSendMedia('audio', finalFile, '');
         } catch (error) {
-          onError(error instanceof Error ? error.message : 'No se pudo preparar el audio en el navegador.');
+          onError(error instanceof Error ? error.message : 'No se pudo preparar el audio para enviarlo.');
         } finally {
           recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
           recordingStreamRef.current = null;
