@@ -227,11 +227,13 @@ export function MessageThread({
         ? 'audio/mp4'
         : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
           ? 'audio/ogg;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
           : '';
 
       if (!mimeType) {
         stream.getTracks().forEach((track) => track.stop());
-        throw new Error('Tu navegador solo graba en un formato que WhatsApp no acepta. Prueba desde otro navegador.');
+        throw new Error('Tu navegador no pudo iniciar una grabacion compatible.');
       }
 
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
