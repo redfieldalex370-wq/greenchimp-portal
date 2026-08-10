@@ -37,7 +37,7 @@ async function convertRecordedAudioForWhatsApp(file: File) {
   const ffmpeg = await getBrowserFfmpeg();
   const sourceExtension = file.type.includes('mp4') ? 'm4a' : file.type.includes('ogg') ? 'ogg' : 'webm';
   const inputName = `input.${sourceExtension}`;
-  const outputName = 'output.ogg';
+  const outputName = 'output.mp3';
 
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
@@ -47,29 +47,21 @@ async function convertRecordedAudioForWhatsApp(file: File) {
       inputName,
       '-vn',
       '-c:a',
-      'libopus',
+      'libmp3lame',
       '-b:a',
-      '32k',
-      '-ac',
-      '1',
-      '-ar',
-      '48000',
+      '96k',
       outputName
     ]);
 
     const output = await ffmpeg.readFile(outputName);
     const bytes = output instanceof Uint8Array ? output : new Uint8Array();
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    const blob = new Blob([arrayBuffer], { type: 'audio/ogg' });
-    return new File([blob], `audio-${Date.now()}.ogg`, { type: 'audio/ogg' });
+    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    return new File([blob], `audio-${Date.now()}.mp3`, { type: 'audio/mpeg' });
   } finally {
     await ffmpeg.deleteFile(inputName).catch(() => undefined);
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
   }
-}
-
-function isWhatsAppReadyAudioMimeType(mimeType: string) {
-  return mimeType.startsWith('audio/ogg') || mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/mpeg');
 }
 
 function StatusMark({ status }: { status: string }) {
@@ -317,9 +309,7 @@ export function MessageThread({
         const rawFile = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
 
         try {
-          const convertedFile = isWhatsAppReadyAudioMimeType(rawFile.type)
-            ? rawFile
-            : await convertRecordedAudioForWhatsApp(rawFile);
+          const convertedFile = await convertRecordedAudioForWhatsApp(rawFile);
           setPendingAttachment({
             file: convertedFile,
             kind: 'audio',
