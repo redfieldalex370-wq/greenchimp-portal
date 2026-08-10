@@ -324,11 +324,7 @@ export function MessageThread({
 
         try {
           const convertedFile = await convertRecordedAudioForWhatsApp(rawFile);
-          setPendingAttachment({
-            file: convertedFile,
-            kind: 'audio',
-            previewUrl: URL.createObjectURL(convertedFile)
-          });
+          await onSendMedia('audio', convertedFile, '');
         } catch (error) {
           onError(error instanceof Error ? error.message : 'No se pudo preparar el audio en el navegador.');
         } finally {
