@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import multer from 'multer';
+import sharp from 'sharp';
 import { z } from 'zod';
 import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
@@ -39,14 +40,46 @@ async function prepareOutgoingFile(input: {
       throw Object.assign(new Error('Por ahora los stickers solo aceptan archivos WEBP.'), { status: 400 });
     }
 
-    if (input.file.size > 100 * 1024) {
-      throw Object.assign(new Error('El sticker WEBP supera el limite permitido por WhatsApp.'), { status: 400 });
+    const stickerVariants = [
+      { size: 512, quality: 80 },
+      { size: 512, quality: 68 },
+      { size: 512, quality: 56 },
+      { size: 460, quality: 56 },
+      { size: 420, quality: 48 }
+    ];
+
+    let normalizedBuffer: Buffer | null = null;
+
+    for (const variant of stickerVariants) {
+      const candidate = await sharp(input.file.buffer, { animated: false })
+        .resize(variant.size, variant.size, {
+          fit: 'contain',
+          withoutEnlargement: false,
+          background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .webp({
+          quality: variant.quality,
+          alphaQuality: 100,
+          effort: 4
+        })
+        .toBuffer();
+
+      if (candidate.byteLength <= 100 * 1024) {
+        normalizedBuffer = candidate;
+        break;
+      }
+    }
+
+    if (!normalizedBuffer) {
+      throw Object.assign(new Error('El sticker WEBP no cumple el tamano/peso que WhatsApp exige.'), { status: 400 });
     }
 
     return {
       ...input.file,
       originalname: `${input.file.originalname.replace(/\.[^.]+$/, '') || 'sticker'}.webp`,
-      mimetype: 'image/webp'
+      mimetype: 'image/webp',
+      buffer: normalizedBuffer,
+      size: normalizedBuffer.byteLength
     };
   }
 
