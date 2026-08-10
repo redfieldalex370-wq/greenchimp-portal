@@ -5,10 +5,11 @@ const API_BASE = import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE ?
 type ApiErrorPayload = { error?: string; details?: unknown };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
-      ...(options.body ? { 'content-type': 'application/json' } : {}),
+      ...(options.body && !isFormData ? { 'content-type': 'application/json' } : {}),
       ...options.headers
     },
     ...options
@@ -58,5 +59,15 @@ export const api = {
     request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages`,
       { method: 'POST', body: JSON.stringify({ text }) }
+    ),
+  sendMedia: (conversation: Conversation, type: string, file: File, caption = '') => {
+    const body = new FormData();
+    body.set('type', type);
+    body.set('caption', caption);
+    body.set('file', file);
+    return request<{ ok: true; message?: Message }>(
+      `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media`,
+      { method: 'POST', body }
     )
+  }
 };

@@ -1,6 +1,12 @@
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import type { Conversation, Message } from '../types';
 import { clockTime, windowCountdown } from '../utils';
+
+type PendingAttachment = {
+  file: File;
+  kind: 'image' | 'audio' | 'video' | 'sticker';
+  previewUrl: string;
+};
 
 function StatusMark({ status }: { status: string }) {
   if (status === 'failed') return <span className="status-mark status-mark--error">!</span>;
@@ -33,20 +39,39 @@ export function MessageThread({
   messages,
   loading,
   sending,
-  onSend
+  onSend,
+  onSendMedia
 }: {
   conversation: Conversation | null;
   messages: Message[];
   loading: boolean;
   sending: boolean;
   onSend: (text: string) => Promise<void>;
+  onSendMedia: (type: string, file: File, caption: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState('');
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const stickerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, conversation?.wa_id]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl);
+    };
+  }, [pendingAttachment]);
+
+  useEffect(() => {
+    setAttachmentMenuOpen(false);
+    clearAttachment();
+  }, [conversation?.wa_id]);
 
   if (!conversation) {
     return (
@@ -60,6 +85,17 @@ export function MessageThread({
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
+    if (pendingAttachment) {
+      const caption = draft.trim();
+      try {
+        await onSendMedia(pendingAttachment.kind, pendingAttachment.file, caption);
+        setDraft('');
+        clearAttachment();
+      } catch {
+        return;
+      }
+      return;
+    }
     const text = draft.trim();
     if (!text || sending || !conversation?.ventana_abierta) return;
     setDraft('');
@@ -75,6 +111,24 @@ export function MessageThread({
       event.preventDefault();
       void submit();
     }
+  }
+
+  function clearAttachment() {
+    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl);
+    setPendingAttachment(null);
+  }
+
+  function selectAttachment(kind: PendingAttachment['kind'], event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    clearAttachment();
+    setPendingAttachment({
+      file,
+      kind,
+      previewUrl: URL.createObjectURL(file)
+    });
+    setAttachmentMenuOpen(false);
   }
 
   return (
@@ -113,7 +167,86 @@ export function MessageThread({
         <div ref={bottomRef} />
       </div>
 
-      <form className="composer" onSubmit={submit}>
+      <form className={`composer ${pendingAttachment ? 'composer--with-attachment' : ''}`} onSubmit={submit}>
+        {pendingAttachment && (
+          <div className="attachment-preview">
+            <div className="attachment-preview__media">
+              {pendingAttachment.kind === 'audio'
+                ? <audio src={pendingAttachment.previewUrl} controls preload="metadata" />
+                : pendingAttachment.kind === 'video'
+                  ? <video src={pendingAttachment.previewUrl} controls preload="metadata" />
+                : <img src={pendingAttachment.previewUrl} alt="Sticker seleccionado" />}
+            </div>
+            <div className="attachment-preview__meta">
+              <strong>{pendingAttachment.file.name}</strong>
+              <span>Listo para conectar al envio multimedia.</span>
+            </div>
+            <button type="button" className="attachment-preview__remove" onClick={clearAttachment} aria-label="Quitar archivo">
+              x
+            </button>
+          </div>
+        )}
+        <div className="composer-row">
+          <div className="attachment-menu">
+            <button
+              type="button"
+              className="attachment-trigger"
+              onClick={() => setAttachmentMenuOpen((open) => !open)}
+              disabled={!conversation.ventana_abierta || sending}
+              aria-label="Adjuntar multimedia"
+              aria-expanded={attachmentMenuOpen}
+            >
+              +
+            </button>
+            {attachmentMenuOpen && (
+              <div className="attachment-popover">
+                <button type="button" onClick={() => imageInputRef.current?.click()}>
+                  <span>I</span>
+                  Imagen
+                </button>
+                <button type="button" onClick={() => audioInputRef.current?.click()}>
+                  <span>A</span>
+                  Audio
+                </button>
+                <button type="button" onClick={() => videoInputRef.current?.click()}>
+                  <span>V</span>
+                  Video
+                </button>
+                <button type="button" onClick={() => stickerInputRef.current?.click()}>
+                  <span>S</span>
+                  Sticker
+                </button>
+              </div>
+            )}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={(event) => selectAttachment('image', event)}
+              hidden
+            />
+            <input
+              ref={stickerInputRef}
+              type="file"
+              accept="image/webp,image/png,image/jpeg"
+              onChange={(event) => selectAttachment('sticker', event)}
+              hidden
+            />
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={(event) => selectAttachment('audio', event)}
+              hidden
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              onChange={(event) => selectAttachment('video', event)}
+              hidden
+            />
+          </div>
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -122,9 +255,10 @@ export function MessageThread({
           disabled={!conversation.ventana_abierta || sending}
           rows={1}
         />
-        <button disabled={!draft.trim() || !conversation.ventana_abierta || sending} aria-label="Enviar mensaje">
+        <button className="send-button" disabled={(!draft.trim() && !pendingAttachment) || !conversation.ventana_abierta || sending} aria-label="Enviar mensaje">
           {sending ? '…' : '➤'}
         </button>
+        </div>
       </form>
     </section>
   );

@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
+import multer from 'multer';
 import { z } from 'zod';
 import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
 import {
   addDemoOutgoingMessage,
+  addOutgoingMediaMessage,
   deleteConversation,
   getMessageMedia,
   listConversations,
@@ -16,11 +18,16 @@ import {
   setBotActive
 } from './repository.js';
 import { sendManualMessage } from './n8n.js';
+import { sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
 
 const app = express();
 const conversationParamsSchema = z.object({
   phoneNumberId: z.string().min(1),
   waId: z.string().min(1)
+});
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 }
 });
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false }));
@@ -221,6 +228,74 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async 
       actor
     });
     res.status(201).json({ ok: true, result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, upload.single('file'), async (req, res, next) => {
+  try {
+    const params = conversationParamsSchema.parse(req.params);
+    const input = z.object({
+      type: z.enum(['image', 'audio', 'video', 'sticker']),
+      caption: z.string().trim().max(1024).optional().default('')
+    }).parse(req.body);
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ ok: false, error: 'Selecciona un archivo multimedia.' });
+      return;
+    }
+    if (input.type === 'image' && !file.mimetype.startsWith('image/')) {
+      res.status(400).json({ ok: false, error: 'El archivo debe ser una imagen.' });
+      return;
+    }
+    if (input.type === 'audio' && !file.mimetype.startsWith('audio/')) {
+      res.status(400).json({ ok: false, error: 'El archivo debe ser audio.' });
+      return;
+    }
+    if (input.type === 'video' && !file.mimetype.startsWith('video/')) {
+      res.status(400).json({ ok: false, error: 'El archivo debe ser video.' });
+      return;
+    }
+    if (input.type === 'sticker' && !['image/webp', 'image/png'].includes(file.mimetype)) {
+      res.status(400).json({ ok: false, error: 'El sticker debe ser WEBP o PNG.' });
+      return;
+    }
+
+    const actor = res.locals.user.name as string;
+    let mediaId: string;
+    let messageId: string;
+
+    if (config.DEMO_MODE) {
+      mediaId = `demo-media-${Date.now()}`;
+      messageId = `wamid.demo.media.${Date.now()}`;
+    } else {
+      const uploadResult = await uploadWhatsAppMedia({
+        phoneNumberId: params.phoneNumberId,
+        file
+      });
+      mediaId = uploadResult.id;
+      const sendResult = await sendWhatsAppMedia({
+        phoneNumberId: params.phoneNumberId,
+        waId: params.waId,
+        mediaId,
+        kind: input.type,
+        caption: input.caption
+      });
+      messageId = sendResult.messages?.[0]?.id ?? `wamid.portal.media.${Date.now()}`;
+    }
+
+    const message = await addOutgoingMediaMessage({
+      phoneNumberId: params.phoneNumberId,
+      waId: params.waId,
+      actor,
+      type: input.type,
+      mediaId,
+      messageId,
+      caption: input.caption
+    });
+
+    res.status(201).json({ ok: true, message });
   } catch (error) {
     next(error);
   }
