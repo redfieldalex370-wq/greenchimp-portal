@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { query, withTransaction } from './db.js';
+import { pool, query, withTransaction } from './db.js';
 import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
@@ -74,22 +74,10 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
-  return query<Conversation>(
-    `SELECT b.phone_number_id,
-            b.wa_id,
-            COALESCE(
-              (SELECT gc.usuario_id::text
-                 FROM public.gc_leads_estado gc
-                WHERE gc.chat_id = b.wa_id
-                   OR gc.manychat_id = b.wa_id
-                   OR gc.telefono = b.wa_id
-                LIMIT 1),
-              (SELECT wc.usuario_id::text
-                 FROM public.wa_clientes_estado wc
-                WHERE wc.whatsapp_phone = b.wa_id
-                   OR wc.subscriber_id = b.wa_id
-                LIMIT 1)
-            ) AS usuario_id,
+  const conversations = await query<Conversation>(
+    `SELECT phone_number_id,
+            wa_id,
+            NULL::text AS usuario_id,
             COALESCE(nombre, 'Sin nombre') AS nombre,
             COALESCE(ultimo_texto, '') AS ultimo_texto,
             ultimo_mensaje,
@@ -101,14 +89,78 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
             COALESCE(fuente, 'WhatsApp Directo') AS fuente,
             pausado_por,
             pausado_en
-      FROM public.wa_bandeja b
+      FROM public.wa_bandeja
       WHERE COALESCE(archivada, FALSE) = FALSE
-        AND ($1 = '' OR b.phone_number_id = $1)
-        AND ($2 = '' OR b.nombre ILIKE '%' || $2 || '%' OR b.wa_id ILIKE '%' || $2 || '%')
-      ORDER BY b.ultimo_mensaje DESC
+        AND ($1 = '' OR phone_number_id = $1)
+        AND ($2 = '' OR nombre ILIKE '%' || $2 || '%' OR wa_id ILIKE '%' || $2 || '%')
+      ORDER BY ultimo_mensaje DESC
       LIMIT 100`,
     [phoneNumberId.trim(), search.trim()]
   );
+
+  if (conversations.length === 0) return conversations;
+
+  const waIds = [...new Set(conversations.map((item) => item.wa_id).filter(Boolean))];
+  const usuarioIdByWaId = new Map<string, string>();
+
+  if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
+    const rows = await query<{ wa_id: string; usuario_id: string }>(
+      `SELECT DISTINCT ON (matched_wa_id)
+              matched_wa_id AS wa_id,
+              usuario_id::text AS usuario_id
+         FROM (
+           SELECT chat_id AS matched_wa_id, usuario_id
+             FROM public.gc_leads_estado
+            WHERE chat_id = ANY($1::text[])
+           UNION ALL
+           SELECT manychat_id AS matched_wa_id, usuario_id
+             FROM public.gc_leads_estado
+            WHERE manychat_id = ANY($1::text[])
+           UNION ALL
+           SELECT telefono AS matched_wa_id, usuario_id
+             FROM public.gc_leads_estado
+            WHERE telefono = ANY($1::text[])
+         ) matches
+        WHERE matched_wa_id IS NOT NULL`,
+      [waIds]
+    );
+
+    for (const row of rows) {
+      if (row.wa_id && row.usuario_id && !usuarioIdByWaId.has(row.wa_id)) {
+        usuarioIdByWaId.set(row.wa_id, row.usuario_id);
+      }
+    }
+  }
+
+  if (pool && await relationExists(pool, 'public.wa_clientes_estado')) {
+    const rows = await query<{ wa_id: string; usuario_id: string }>(
+      `SELECT DISTINCT ON (matched_wa_id)
+              matched_wa_id AS wa_id,
+              usuario_id::text AS usuario_id
+         FROM (
+           SELECT whatsapp_phone AS matched_wa_id, usuario_id
+             FROM public.wa_clientes_estado
+            WHERE whatsapp_phone = ANY($1::text[])
+           UNION ALL
+           SELECT subscriber_id AS matched_wa_id, usuario_id
+             FROM public.wa_clientes_estado
+            WHERE subscriber_id = ANY($1::text[])
+         ) matches
+        WHERE matched_wa_id IS NOT NULL`,
+      [waIds]
+    );
+
+    for (const row of rows) {
+      if (row.wa_id && row.usuario_id && !usuarioIdByWaId.has(row.wa_id)) {
+        usuarioIdByWaId.set(row.wa_id, row.usuario_id);
+      }
+    }
+  }
+
+  return conversations.map((item) => ({
+    ...item,
+    usuario_id: usuarioIdByWaId.get(item.wa_id) ?? null
+  }));
 }
 
 export async function listMessages(phoneNumberId: string, waId: string): Promise<Message[]> {
