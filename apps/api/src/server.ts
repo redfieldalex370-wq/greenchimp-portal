@@ -456,11 +456,18 @@ app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
     const reply =
       (typeof payload === 'object' && payload && 'reply' in payload && typeof payload.reply === 'string' && payload.reply) ||
       (typeof payload === 'object' && payload && 'respuesta' in payload && typeof payload.respuesta === 'string' && payload.respuesta) ||
+      (typeof payload === 'object' && payload && 'final_text' in payload && typeof payload.final_text === 'string' && payload.final_text) ||
       (typeof payload === 'object' && payload && 'text' in payload && typeof payload.text === 'string' && payload.text) ||
       (typeof payload === 'object' && payload && 'texto' in payload && typeof payload.texto === 'string' && payload.texto) ||
-      'Prueba enviada correctamente.';
+      '';
 
-    res.json({ ok: true, reply, raw: payload });
+    const normalizedReply = reply.trim() || (
+      typeof payload === 'object' && payload && 'ok' in payload && payload.ok === true
+        ? 'El webhook recibió tu mensaje, pero ese flujo solo confirma el envío y no devuelve la respuesta del bot al portal. Para probar conversación dentro del portal, el webhook debe responder con "reply", "respuesta" o "final_text".'
+        : 'Prueba enviada correctamente.'
+    );
+
+    res.json({ ok: true, reply: normalizedReply, raw: payload });
   } catch (error) {
     next(error);
   }
