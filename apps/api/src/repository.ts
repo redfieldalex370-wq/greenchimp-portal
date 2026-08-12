@@ -110,18 +110,25 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
               usuario_id::text AS usuario_id
          FROM (
            SELECT chat_id AS matched_wa_id, usuario_id
+                  ,fecha_actualizacion
              FROM public.gc_leads_estado
             WHERE chat_id = ANY($1::text[])
+              AND COALESCE(borrado_en_portal, false) = false
            UNION ALL
            SELECT manychat_id AS matched_wa_id, usuario_id
+                  ,fecha_actualizacion
              FROM public.gc_leads_estado
             WHERE manychat_id = ANY($1::text[])
+              AND COALESCE(borrado_en_portal, false) = false
            UNION ALL
            SELECT telefono AS matched_wa_id, usuario_id
+                  ,fecha_actualizacion
              FROM public.gc_leads_estado
             WHERE telefono = ANY($1::text[])
+              AND COALESCE(borrado_en_portal, false) = false
          ) matches
-        WHERE matched_wa_id IS NOT NULL`,
+        WHERE matched_wa_id IS NOT NULL
+        ORDER BY matched_wa_id, fecha_actualizacion DESC NULLS LAST`,
       [waIds]
     );
 
@@ -139,14 +146,17 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
               usuario_id::text AS usuario_id
          FROM (
            SELECT whatsapp_phone AS matched_wa_id, usuario_id
+                  ,actualizado_en
              FROM public.wa_clientes_estado
             WHERE whatsapp_phone = ANY($1::text[])
            UNION ALL
            SELECT subscriber_id AS matched_wa_id, usuario_id
+                  ,actualizado_en
              FROM public.wa_clientes_estado
             WHERE subscriber_id = ANY($1::text[])
          ) matches
-        WHERE matched_wa_id IS NOT NULL`,
+        WHERE matched_wa_id IS NOT NULL
+        ORDER BY matched_wa_id, actualizado_en DESC NULLS LAST`,
       [waIds]
     );
 
