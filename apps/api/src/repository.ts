@@ -3,6 +3,14 @@ import { query, withTransaction } from './db.js';
 import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
+async function relationExists(client: { query: (text: string, values?: unknown[]) => Promise<{ rows: Array<{ exists: boolean }> }> }, relationName: string) {
+  const result = await client.query(
+    `SELECT to_regclass($1) IS NOT NULL AS exists`,
+    [relationName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
 export async function listConversations(search = '', phoneNumberId = ''): Promise<Conversation[]> {
   if (config.DEMO_MODE) {
     const term = search.trim().toLowerCase();
@@ -113,47 +121,61 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
 
     if (existing.rowCount === 0) return false;
 
+    const sessionKeys = [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`];
+
     await client.query(
       `DELETE FROM public.wa_mensajes
         WHERE phone_number_id = $1 AND wa_id = $2`,
       [phoneNumberId, waId]
     );
 
-    await client.query(
-      `DELETE FROM public.wa_followups
-        WHERE phone_number_id = $1 AND wa_id = $2`,
-      [phoneNumberId, waId]
-    );
+    if (await relationExists(client, 'public.wa_followups')) {
+      await client.query(
+        `DELETE FROM public.wa_followups
+          WHERE phone_number_id = $1 AND wa_id = $2`,
+        [phoneNumberId, waId]
+      );
+    }
 
-    await client.query(
-      `DELETE FROM public.wa_followup_logs
-        WHERE phone_number_id = $1 AND wa_id = $2`,
-      [phoneNumberId, waId]
-    );
+    if (await relationExists(client, 'public.wa_followup_logs')) {
+      await client.query(
+        `DELETE FROM public.wa_followup_logs
+          WHERE phone_number_id = $1 AND wa_id = $2`,
+        [phoneNumberId, waId]
+      );
+    }
 
-    await client.query(
-      `DELETE FROM public.n8n_chat_histories
-        WHERE session_id IN ($1, $2, $3, $4)`,
-      [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]
-    );
+    if (await relationExists(client, 'public.n8n_chat_histories')) {
+      await client.query(
+        `DELETE FROM public.n8n_chat_histories
+          WHERE session_id = ANY($1::text[])`,
+        [sessionKeys]
+      );
+    }
 
-    await client.query(
-      `DELETE FROM public.chat_history
-        WHERE session_id IN ($1, $2, $3, $4)`,
-      [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]
-    );
+    if (await relationExists(client, 'public.chat_history')) {
+      await client.query(
+        `DELETE FROM public.chat_history
+          WHERE session_id = ANY($1::text[])`,
+        [sessionKeys]
+      );
+    }
 
-    await client.query(
-      `DELETE FROM public.bot_users
-        WHERE session_id IN ($1, $2, $3, $4)`,
-      [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]
-    );
+    if (await relationExists(client, 'public.bot_users')) {
+      await client.query(
+        `DELETE FROM public.bot_users
+          WHERE session_id = ANY($1::text[])`,
+        [sessionKeys]
+      );
+    }
 
-    await client.query(
-      `DELETE FROM public.bot_session
-        WHERE session_key IN ($1, $2, $3, $4)`,
-      [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]
-    );
+    if (await relationExists(client, 'public.bot_session')) {
+      await client.query(
+        `DELETE FROM public.bot_session
+          WHERE session_key = ANY($1::text[])`,
+        [sessionKeys]
+      );
+    }
 
     await client.query(
       `DELETE FROM public.wa_conversaciones
