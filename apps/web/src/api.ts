@@ -74,5 +74,10 @@ export const api = {
     request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media-id`,
       { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption }) }
-    )
+    ),
+  testBotSend: (input: { sendUrl: string; flowUrl?: string; text: string; actor: string; phoneNumberId: string }) =>
+    request<{ ok: true; reply: string; raw?: unknown }>('/test-bot/send', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    })
 };

@@ -22,6 +22,8 @@ type TestBotConfig = {
   sendUrl: string;
 };
 
+const TEST_CHAT_WA_ID = 'portal-test-chat';
+
 const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
   { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
@@ -65,6 +67,7 @@ export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [testMessages, setTestMessages] = useState<Message[]>([]);
   const [search, setSearch] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -91,9 +94,43 @@ export default function App() {
     [testAccount]
   );
 
+  const isTestMode = Boolean(testAccount && activeAccountId === testAccount.id);
+
+  const testConversation = useMemo<Conversation | null>(() => {
+    if (!testAccount) return null;
+    const lastMessage = testMessages[testMessages.length - 1];
+    return {
+      phone_number_id: testAccount.id,
+      wa_id: TEST_CHAT_WA_ID,
+      nombre: testAccount.name || 'Pruebas bot',
+      ultimo_texto: lastMessage?.texto || 'Escribe para probar el flujo',
+      ultimo_mensaje: lastMessage?.creado_en || new Date().toISOString(),
+      no_leidos: 0,
+      bot_activo: true,
+      ventana_abierta: true,
+      ventana_expira: null,
+      tipo_ventana: 'prueba',
+      fuente: 'Flujo de prueba',
+      pausado_por: null,
+      pausado_en: null
+    };
+  }, [testAccount, testMessages]);
+
+  const displayedConversations = useMemo(() => {
+    if (!isTestMode) return conversations;
+    if (!testConversation) return [];
+    const term = search.trim().toLowerCase();
+    if (!term) return [testConversation];
+    return [testConversation].filter((item) =>
+      item.nombre.toLowerCase().includes(term) || item.wa_id.toLowerCase().includes(term)
+    );
+  }, [isTestMode, conversations, testConversation, search]);
+
+  const displayedMessages = isTestMode ? testMessages : messages;
+
   const selected = useMemo(
-    () => conversations.find((item) => `${item.phone_number_id}:${item.wa_id}` === selectedKey) ?? null,
-    [conversations, selectedKey]
+    () => displayedConversations.find((item) => `${item.phone_number_id}:${item.wa_id}` === selectedKey) ?? null,
+    [displayedConversations, selectedKey]
   );
 
   useEffect(() => {
@@ -125,6 +162,10 @@ export default function App() {
   }, []);
 
   const refreshConversations = useCallback(async (term = search) => {
+    if (isTestMode) {
+      if (testConversation) setSelectedKey(`${testConversation.phone_number_id}:${testConversation.wa_id}`);
+      return;
+    }
     setLoadingConversations(true);
     try {
       const response = await api.conversations(term, activeAccountId);
@@ -151,7 +192,7 @@ export default function App() {
     } finally {
       setLoadingConversations(false);
     }
-  }, [search, activeAccountId, showToast, playNewConversationSound]);
+  }, [search, activeAccountId, showToast, playNewConversationSound, isTestMode, testConversation]);
 
   useEffect(() => {
     if (!user) return;
@@ -168,6 +209,7 @@ export default function App() {
   }, [user]);
 
   const refreshMessages = useCallback(async (conversation: Conversation) => {
+    if (isTestMode) return;
     setLoadingMessages(true);
     try {
       const response = await api.messages(conversation);
@@ -177,7 +219,7 @@ export default function App() {
     } finally {
       setLoadingMessages(false);
     }
-  }, [showToast]);
+  }, [showToast, isTestMode]);
 
   useEffect(() => {
     api.me()
@@ -199,6 +241,14 @@ export default function App() {
   }, [user, search, refreshConversations]);
 
   useEffect(() => {
+    if (isTestMode) {
+      if (testConversation) {
+        setSelectedKey(`${testConversation.phone_number_id}:${testConversation.wa_id}`);
+      } else {
+        setSelectedKey(null);
+      }
+      return;
+    }
     if (!selected) {
       setMessages([]);
       return;
@@ -214,7 +264,7 @@ export default function App() {
 
     const timer = window.setInterval(() => void refreshMessages(selected), 5000);
     return () => window.clearInterval(timer);
-  }, [selected?.phone_number_id, selected?.wa_id, refreshMessages]);
+  }, [selected?.phone_number_id, selected?.wa_id, refreshMessages, isTestMode, testConversation]);
 
   async function login(username: string, password: string) {
     const response = await api.login(username, password);
@@ -253,6 +303,55 @@ export default function App() {
 
   async function send(text: string) {
     if (!selected) return;
+    if (isTestMode) {
+      if (!testAccount) return;
+      setSending(true);
+      const sentAt = new Date().toISOString();
+      const outgoing: Message = {
+        id: `test-out-${Date.now()}`,
+        message_id: `test-out-${Date.now()}`,
+        phone_number_id: testAccount.id,
+        wa_id: TEST_CHAT_WA_ID,
+        direccion: 'out',
+        autor: user?.name ?? 'humano',
+        tipo: 'text',
+        texto: text,
+        media_id: null,
+        estado: 'sent',
+        creado_en: sentAt
+      };
+      setTestMessages((items) => [...items, outgoing]);
+      try {
+        const result = await api.testBotSend({
+          sendUrl: testBotConfig.sendUrl,
+          flowUrl: testBotConfig.flowUrl,
+          text,
+          actor: user?.name ?? 'humano',
+          phoneNumberId: testAccount.id
+        });
+        const incoming: Message = {
+          id: `test-in-${Date.now()}`,
+          message_id: `test-in-${Date.now()}`,
+          phone_number_id: testAccount.id,
+          wa_id: TEST_CHAT_WA_ID,
+          direccion: 'in',
+          autor: testAccount.name || 'Pruebas bot',
+          tipo: 'text',
+          texto: result.reply || 'Sin respuesta del flujo.',
+          media_id: null,
+          estado: 'received',
+          creado_en: new Date().toISOString()
+        };
+        setTestMessages((items) => [...items, incoming]);
+      } catch (error) {
+        setTestMessages((items) => items.map((item) => item.id === outgoing.id ? { ...item, estado: 'failed' } : item));
+        showToast(error instanceof Error ? error.message : 'No se pudo enviar la prueba.');
+        throw error;
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     setSending(true);
     const optimistic: Message = {
       id: `optimistic-${Date.now()}`,
@@ -310,6 +409,10 @@ export default function App() {
 
   async function toggleBot(active: boolean) {
     if (!selected) return;
+    if (isTestMode) {
+      showToast(active ? 'En pruebas el bot ya está activo.' : 'El chat de prueba no se puede pausar.');
+      return;
+    }
     setUpdatingBot(true);
     try {
       await api.setBot(selected, active);
@@ -323,6 +426,11 @@ export default function App() {
 
   async function removeConversation() {
     if (!selected) return;
+    if (isTestMode) {
+      setTestMessages([]);
+      showToast('Historial de prueba limpiado');
+      return;
+    }
     const confirmed = window.confirm(
       `¿Eliminar la conversación de ${selected.nombre}? Se borrarán también todos sus mensajes. Volverá a aparecer si el contacto escribe de nuevo.`
     );
@@ -375,7 +483,7 @@ export default function App() {
 
       <main className="workspace">
         <ConversationList
-          conversations={conversations}
+          conversations={displayedConversations}
           selected={selected}
           search={search}
           onSearch={setSearch}
@@ -384,7 +492,7 @@ export default function App() {
         />
         <MessageThread
           conversation={selected}
-          messages={messages}
+          messages={displayedMessages}
           loading={loadingMessages}
           sending={sending}
           onSend={send}

@@ -416,6 +416,56 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAut
   }
 });
 
+app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
+  try {
+    const input = z.object({
+      sendUrl: z.string().url(),
+      flowUrl: z.string().url().optional().or(z.literal('')),
+      text: z.string().trim().min(1).max(4096),
+      actor: z.string().trim().min(1).max(120),
+      phoneNumberId: z.string().trim().min(1).max(120)
+    }).parse(req.body);
+
+    const response = await fetch(input.sendUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(config.N8N_PORTAL_KEY ? { 'x-portal-key': config.N8N_PORTAL_KEY } : {})
+      },
+      body: JSON.stringify({
+        phone_number_id: input.phoneNumberId,
+        wa_id: 'portal-test-chat',
+        texto: input.text,
+        usuario: input.actor,
+        flow_url: input.flowUrl || undefined,
+        source: 'portal_test'
+      }),
+      signal: AbortSignal.timeout(20_000)
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      res.status(response.status).json({
+        ok: false,
+        error: `n8n respondió ${response.status}`,
+        details: payload
+      });
+      return;
+    }
+
+    const reply =
+      (typeof payload === 'object' && payload && 'reply' in payload && typeof payload.reply === 'string' && payload.reply) ||
+      (typeof payload === 'object' && payload && 'respuesta' in payload && typeof payload.respuesta === 'string' && payload.respuesta) ||
+      (typeof payload === 'object' && payload && 'text' in payload && typeof payload.text === 'string' && payload.text) ||
+      (typeof payload === 'object' && payload && 'texto' in payload && typeof payload.texto === 'string' && payload.texto) ||
+      'Prueba enviada correctamente.';
+
+    res.json({ ok: true, reply, raw: payload });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const bundledWebDist = path.resolve(currentDir, 'web');
 const workspaceWebDist = path.resolve(currentDir, '../../web/dist');
