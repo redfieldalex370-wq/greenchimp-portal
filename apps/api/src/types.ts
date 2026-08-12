@@ -8,6 +8,7 @@ export type PortalUser = {
 export type Conversation = {
   phone_number_id: string;
   wa_id: string;
+  usuario_id?: string | null;
   nombre: string;
   ultimo_texto: string;
   ultimo_mensaje: string;

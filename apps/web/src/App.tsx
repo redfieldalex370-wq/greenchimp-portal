@@ -39,6 +39,13 @@ const DEFAULT_TEST_BOT_CONFIG: TestBotConfig = {
   sendUrl: ''
 };
 
+function conversationKey(conversation: Pick<Conversation, 'phone_number_id' | 'wa_id' | 'usuario_id'>) {
+  const usuarioId = conversation.usuario_id?.trim();
+  return usuarioId
+    ? `${conversation.phone_number_id}:uid:${usuarioId}`
+    : `${conversation.phone_number_id}:wa:${conversation.wa_id}`;
+}
+
 function readStoredTestBotConfig(): TestBotConfig {
   if (typeof window === 'undefined') return DEFAULT_TEST_BOT_CONFIG;
   try {
@@ -102,6 +109,7 @@ export default function App() {
     return {
       phone_number_id: testAccount.id,
       wa_id: TEST_CHAT_WA_ID,
+      usuario_id: TEST_CHAT_WA_ID,
       nombre: testAccount.name || 'Pruebas bot',
       ultimo_texto: lastMessage?.texto || 'Escribe para probar el flujo',
       ultimo_mensaje: lastMessage?.creado_en || new Date().toISOString(),
@@ -129,7 +137,7 @@ export default function App() {
   const displayedMessages = isTestMode ? testMessages : messages;
 
   const selected = useMemo(
-    () => displayedConversations.find((item) => `${item.phone_number_id}:${item.wa_id}` === selectedKey) ?? null,
+    () => displayedConversations.find((item) => conversationKey(item) === selectedKey) ?? null,
     [displayedConversations, selectedKey]
   );
 
@@ -163,16 +171,16 @@ export default function App() {
 
   const refreshConversations = useCallback(async (term = search) => {
     if (isTestMode) {
-      if (testConversation) setSelectedKey(`${testConversation.phone_number_id}:${testConversation.wa_id}`);
+      if (testConversation) setSelectedKey(conversationKey(testConversation));
       return;
     }
     setLoadingConversations(true);
     try {
       const response = await api.conversations(term, activeAccountId);
       if (!term.trim()) {
-        const nextKeys = new Set(response.conversations.map((item) => `${item.phone_number_id}:${item.wa_id}`));
+        const nextKeys = new Set(response.conversations.map((item) => conversationKey(item)));
         const known = knownConversationKeys.current;
-        if (known && response.conversations.some((item) => !known.has(`${item.phone_number_id}:${item.wa_id}`))) {
+        if (known && response.conversations.some((item) => !known.has(conversationKey(item)))) {
           playNewConversationSound();
           showToast('Nuevo chat recibido');
         }
@@ -180,11 +188,11 @@ export default function App() {
       }
       setConversations(response.conversations);
       setSelectedKey((current) => {
-        if (current && response.conversations.some((item) => `${item.phone_number_id}:${item.wa_id}` === current)) {
+        if (current && response.conversations.some((item) => conversationKey(item) === current)) {
           return current;
         }
         const first = response.conversations[0];
-        return first ? `${first.phone_number_id}:${first.wa_id}` : null;
+        return first ? conversationKey(first) : null;
       });
     } catch (error) {
       if ((error as Error & { status?: number }).status === 401) setUser(null);
@@ -243,7 +251,7 @@ export default function App() {
   useEffect(() => {
     if (isTestMode) {
       if (testConversation) {
-        setSelectedKey(`${testConversation.phone_number_id}:${testConversation.wa_id}`);
+        setSelectedKey(conversationKey(testConversation));
       } else {
         setSelectedKey(null);
       }
@@ -312,6 +320,7 @@ export default function App() {
         message_id: `test-out-${Date.now()}`,
         phone_number_id: testAccount.id,
         wa_id: TEST_CHAT_WA_ID,
+        usuario_id: TEST_CHAT_WA_ID,
         direccion: 'out',
         autor: user?.name ?? 'humano',
         tipo: 'text',
@@ -334,6 +343,7 @@ export default function App() {
           message_id: `test-in-${Date.now()}`,
           phone_number_id: testAccount.id,
           wa_id: TEST_CHAT_WA_ID,
+          usuario_id: TEST_CHAT_WA_ID,
           direccion: 'in',
           autor: testAccount.name || 'Pruebas bot',
           tipo: 'text',
@@ -358,6 +368,7 @@ export default function App() {
       message_id: `optimistic-${Date.now()}`,
       phone_number_id: selected.phone_number_id,
       wa_id: selected.wa_id,
+      usuario_id: selected.usuario_id,
       direccion: 'out',
       autor: user?.name ?? 'humano',
       tipo: 'text',
@@ -487,7 +498,7 @@ export default function App() {
           selected={selected}
           search={search}
           onSearch={setSearch}
-          onSelect={(conversation) => setSelectedKey(`${conversation.phone_number_id}:${conversation.wa_id}`)}
+          onSelect={(conversation) => setSelectedKey(conversationKey(conversation))}
           loading={loadingConversations}
         />
         <MessageThread

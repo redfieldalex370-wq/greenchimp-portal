@@ -53,7 +53,10 @@ export const api = {
   deleteConversation: (conversation: Conversation) =>
     request<{ ok: true }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}`,
-      { method: 'DELETE' }
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ usuario_id: conversation.usuario_id ?? null })
+      }
     ),
   send: (conversation: Conversation, text: string) =>
     request<{ ok: true; message?: Message }>(

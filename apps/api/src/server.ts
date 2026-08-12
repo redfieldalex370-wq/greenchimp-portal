@@ -187,7 +187,8 @@ app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (
 app.delete('/api/conversations/:phoneNumberId/:waId', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
-    const deleted = await deleteConversation(params.phoneNumberId, params.waId);
+    const input = z.object({ usuario_id: z.string().trim().optional().nullable() }).parse(req.body ?? {});
+    const deleted = await deleteConversation(params.phoneNumberId, params.waId, input.usuario_id);
     if (!deleted) {
       res.status(404).json({ ok: false, error: 'La conversación ya no existe.' });
       return;
@@ -516,3 +517,4 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 app.listen(config.PORT, () => {
   console.log(`Green Chimp Portal API en http://localhost:${config.PORT} (${config.DEMO_MODE ? 'demo' : 'producción'})`);
 });
+

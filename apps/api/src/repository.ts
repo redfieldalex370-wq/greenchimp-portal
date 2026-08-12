@@ -75,8 +75,21 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   }
 
   return query<Conversation>(
-    `SELECT phone_number_id,
-            wa_id,
+    `SELECT b.phone_number_id,
+            b.wa_id,
+            COALESCE(
+              (SELECT gc.usuario_id::text
+                 FROM public.gc_leads_estado gc
+                WHERE gc.chat_id = b.wa_id
+                   OR gc.manychat_id = b.wa_id
+                   OR gc.telefono = b.wa_id
+                LIMIT 1),
+              (SELECT wc.usuario_id::text
+                 FROM public.wa_clientes_estado wc
+                WHERE wc.whatsapp_phone = b.wa_id
+                   OR wc.subscriber_id = b.wa_id
+                LIMIT 1)
+            ) AS usuario_id,
             COALESCE(nombre, 'Sin nombre') AS nombre,
             COALESCE(ultimo_texto, '') AS ultimo_texto,
             ultimo_mensaje,
@@ -88,11 +101,11 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
             COALESCE(fuente, 'WhatsApp Directo') AS fuente,
             pausado_por,
             pausado_en
-      FROM public.wa_bandeja
+      FROM public.wa_bandeja b
       WHERE COALESCE(archivada, FALSE) = FALSE
-        AND ($1 = '' OR phone_number_id = $1)
-        AND ($2 = '' OR nombre ILIKE '%' || $2 || '%' OR wa_id ILIKE '%' || $2 || '%')
-      ORDER BY ultimo_mensaje DESC
+        AND ($1 = '' OR b.phone_number_id = $1)
+        AND ($2 = '' OR b.nombre ILIKE '%' || $2 || '%' OR b.wa_id ILIKE '%' || $2 || '%')
+      ORDER BY b.ultimo_mensaje DESC
       LIMIT 100`,
     [phoneNumberId.trim(), search.trim()]
   );
@@ -159,7 +172,7 @@ export async function markRead(phoneNumberId: string, waId: string) {
   );
 }
 
-export async function deleteConversation(phoneNumberId: string, waId: string): Promise<boolean> {
+export async function deleteConversation(phoneNumberId: string, waId: string, usuarioId?: string | null): Promise<boolean> {
   if (config.DEMO_MODE) {
     return deleteDemoConversation(phoneNumberId, waId);
   }
@@ -175,7 +188,10 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
 
     if (existing.rowCount === 0) return false;
 
-    const sessionKeys = await collectStateSessionKeys(client, waId);
+    const sessionKeys = await collectStateSessionKeys(client, usuarioId?.trim() || waId);
+    if (usuarioId?.trim()) {
+      sessionKeys.push(waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`);
+    }
 
     await client.query(
       `DELETE FROM public.wa_mensajes
@@ -236,8 +252,9 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
         `DELETE FROM public.gc_leads_estado
           WHERE chat_id = $1
              OR manychat_id = $1
-             OR telefono = $1`,
-        [waId]
+             OR telefono = $1
+             OR usuario_id::text = $2`,
+        [waId, usuarioId?.trim() || '']
       );
     }
 
@@ -245,8 +262,9 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
       await client.query(
         `DELETE FROM public.wa_clientes_estado
           WHERE whatsapp_phone = $1
-             OR subscriber_id = $1`,
-        [waId]
+             OR subscriber_id = $1
+             OR usuario_id::text = $2`,
+        [waId, usuarioId?.trim() || '']
       );
     }
 
