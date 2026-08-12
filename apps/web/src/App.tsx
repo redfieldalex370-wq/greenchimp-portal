@@ -60,7 +60,7 @@ export default function App() {
   const [draftTestBotConfig, setDraftTestBotConfig] = useState<TestBotConfig>(() => readStoredTestBotConfig());
   const [user, setUser] = useState<PortalUser | null>(null);
   const [activeAccountId, setActiveAccountId] = useState<string>(BASE_PORTAL_ACCOUNTS[0].id);
-  const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const [showTestConfig, setShowTestConfig] = useState(false);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -247,6 +247,7 @@ export default function App() {
     };
     setTestBotConfig(nextConfig);
     window.localStorage.setItem(TEST_BOT_STORAGE_KEY, JSON.stringify(nextConfig));
+    setShowTestConfig(false);
     showToast('Configuración de pruebas guardada');
   }
 
@@ -344,9 +345,6 @@ export default function App() {
   if (booting) return <div className="boot-screen"><div className="brand-orbit">GC</div><p>Abriendo la bandeja…</p></div>;
   if (!user) return <LoginScreen onLogin={login} />;
 
-  const primaryAccounts = portalAccounts.filter((account) => account.group !== 'test');
-  const testAccounts = portalAccounts.filter((account) => account.group === 'test');
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -355,7 +353,7 @@ export default function App() {
           <div><strong>Green Chimp</strong><span>Portal de conversaciones</span></div>
         </div>
         <nav className="account-switcher" aria-label="Cuentas de WhatsApp">
-          {primaryAccounts.map((account) => (
+          {portalAccounts.map((account) => (
             <button
               key={account.id}
               className={account.id === activeAccountId ? 'is-active' : ''}
@@ -367,85 +365,9 @@ export default function App() {
               <span><strong>{account.name}</strong><small>{account.number}</small></span>
             </button>
           ))}
-          <div className={`account-switcher-dropdown ${showTestAccounts ? 'is-open' : ''}`}>
-            <button
-              type="button"
-              className={`account-switcher-dropdown__trigger ${testAccounts.some((account) => account.id === activeAccountId) ? 'is-active' : ''}`}
-              onClick={() => setShowTestAccounts((current) => !current)}
-              aria-expanded={showTestAccounts}
-              aria-haspopup="menu"
-            >
-              <span>PR</span>
-              <span><strong>Pruebas bot</strong><small>Flujos temporales</small></span>
-            </button>
-            {showTestAccounts && (
-              <div className="account-switcher-dropdown__menu" role="menu">
-                <div className="account-switcher-dropdown__config">
-                  <label>
-                    <span>Nombre</span>
-                    <input
-                      value={draftTestBotConfig.label}
-                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, label: event.target.value }))}
-                      placeholder="Pruebas bot"
-                    />
-                  </label>
-                  <label>
-                    <span>Número visible</span>
-                    <input
-                      value={draftTestBotConfig.displayNumber}
-                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, displayNumber: event.target.value }))}
-                      placeholder="Flujo temporal"
-                    />
-                  </label>
-                  <label>
-                    <span>Phone Number ID</span>
-                    <input
-                      value={draftTestBotConfig.phoneNumberId}
-                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, phoneNumberId: event.target.value }))}
-                      placeholder="620..."
-                    />
-                  </label>
-                  <label>
-                    <span>URL del flujo</span>
-                    <input
-                      value={draftTestBotConfig.flowUrl}
-                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, flowUrl: event.target.value }))}
-                      placeholder="https://n8n.../workflow/..."
-                    />
-                  </label>
-                  <label>
-                    <span>URL de envío</span>
-                    <input
-                      value={draftTestBotConfig.sendUrl}
-                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, sendUrl: event.target.value }))}
-                      placeholder="https://n8n.../webhook/..."
-                    />
-                  </label>
-                  <button type="button" className="account-switcher-dropdown__save" onClick={saveTestBotConfig}>
-                    Guardar prueba
-                  </button>
-                </div>
-                {testAccounts.map((account) => (
-                  <button
-                    key={account.id}
-                    type="button"
-                    className={account.id === activeAccountId ? 'is-active' : ''}
-                    onClick={() => {
-                      selectAccount(account.id);
-                      setShowTestAccounts(false);
-                    }}
-                    role="menuitem"
-                    title={`${account.name} · ${account.number}`}
-                  >
-                    <span>{account.initials}</span>
-                    <span><strong>{account.name}</strong><small>{account.number}</small></span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </nav>
         <div className="topbar-user">
+          <button className="ghost-button" onClick={() => setShowTestConfig(true)}>Configurar prueba</button>
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
           <button onClick={() => void logout()}>Salir</button>
         </div>
@@ -480,6 +402,64 @@ export default function App() {
       </main>
 
       {toast && <div className="toast">{toast}</div>}
+      {showTestConfig && (
+        <div className="modal-backdrop" onClick={() => setShowTestConfig(false)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-card__header">
+              <div>
+                <p className="eyebrow">PRUEBA</p>
+                <h3>Configurar chat de prueba</h3>
+              </div>
+              <button type="button" className="modal-card__close" onClick={() => setShowTestConfig(false)}>×</button>
+            </div>
+            <div className="account-switcher-dropdown__config account-switcher-dropdown__config--modal">
+              <label>
+                <span>Nombre</span>
+                <input
+                  value={draftTestBotConfig.label}
+                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, label: event.target.value }))}
+                  placeholder="Pruebas bot"
+                />
+              </label>
+              <label>
+                <span>Número visible</span>
+                <input
+                  value={draftTestBotConfig.displayNumber}
+                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, displayNumber: event.target.value }))}
+                  placeholder="Flujo temporal"
+                />
+              </label>
+              <label>
+                <span>Phone Number ID</span>
+                <input
+                  value={draftTestBotConfig.phoneNumberId}
+                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, phoneNumberId: event.target.value }))}
+                  placeholder="620..."
+                />
+              </label>
+              <label>
+                <span>URL del flujo</span>
+                <input
+                  value={draftTestBotConfig.flowUrl}
+                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, flowUrl: event.target.value }))}
+                  placeholder="https://n8n.../workflow/..."
+                />
+              </label>
+              <label>
+                <span>URL de envío</span>
+                <input
+                  value={draftTestBotConfig.sendUrl}
+                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, sendUrl: event.target.value }))}
+                  placeholder="https://n8n.../webhook/..."
+                />
+              </label>
+              <button type="button" className="account-switcher-dropdown__save" onClick={saveTestBotConfig}>
+                Guardar prueba
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
