@@ -6,14 +6,49 @@ import { ConversationList } from './components/ConversationList';
 import { MessageThread } from './components/MessageThread';
 import { ContactPanel } from './components/ContactPanel';
 
-const PORTAL_ACCOUNTS = [
+type PortalAccount = {
+  id: string;
+  name: string;
+  number: string;
+  initials: string;
+  group?: 'main' | 'test';
+};
+
+const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
   { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
-] as const;
+];
+
+const MUNDO_AVENTURERO_ACCOUNT: PortalAccount | null = import.meta.env.VITE_MUNDO_AVENTURERO_PHONE_NUMBER_ID
+  ? {
+      id: import.meta.env.VITE_MUNDO_AVENTURERO_PHONE_NUMBER_ID,
+      name: 'Mundo Aventurero',
+      number: import.meta.env.VITE_MUNDO_AVENTURERO_DISPLAY_NUMBER ?? 'Configurar número',
+      initials: 'MA'
+    }
+  : null;
+
+const MUNDO_AVENTURERO_TEST_ACCOUNT: PortalAccount | null =
+  import.meta.env.VITE_MUNDO_AVENTURERO_TEST_ENABLED === 'true' && import.meta.env.VITE_MUNDO_AVENTURERO_TEST_PHONE_NUMBER_ID
+    ? {
+        id: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_PHONE_NUMBER_ID,
+        name: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_LABEL ?? 'Pruebas bot',
+        number: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_DISPLAY_NUMBER ?? 'Flujo de prueba',
+        initials: 'TB',
+        group: 'test'
+      }
+    : null;
+
+const PORTAL_ACCOUNTS: PortalAccount[] = [
+  ...BASE_PORTAL_ACCOUNTS,
+  ...(MUNDO_AVENTURERO_ACCOUNT ? [MUNDO_AVENTURERO_ACCOUNT] : []),
+  ...(MUNDO_AVENTURERO_TEST_ACCOUNT ? [MUNDO_AVENTURERO_TEST_ACCOUNT] : [])
+];
 
 export default function App() {
   const [user, setUser] = useState<PortalUser | null>(null);
   const [activeAccountId, setActiveAccountId] = useState<string>(PORTAL_ACCOUNTS[0].id);
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -262,6 +297,9 @@ export default function App() {
   if (booting) return <div className="boot-screen"><div className="brand-orbit">GC</div><p>Abriendo la bandeja…</p></div>;
   if (!user) return <LoginScreen onLogin={login} />;
 
+  const primaryAccounts = PORTAL_ACCOUNTS.filter((account) => account.group !== 'test');
+  const testAccounts = PORTAL_ACCOUNTS.filter((account) => account.group === 'test');
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -270,7 +308,7 @@ export default function App() {
           <div><strong>Green Chimp</strong><span>Portal de conversaciones</span></div>
         </div>
         <nav className="account-switcher" aria-label="Cuentas de WhatsApp">
-          {PORTAL_ACCOUNTS.map((account) => (
+          {primaryAccounts.map((account) => (
             <button
               key={account.id}
               className={account.id === activeAccountId ? 'is-active' : ''}
@@ -282,6 +320,40 @@ export default function App() {
               <span><strong>{account.name}</strong><small>{account.number}</small></span>
             </button>
           ))}
+          {testAccounts.length > 0 && (
+            <div className={`account-switcher-dropdown ${showTestAccounts ? 'is-open' : ''}`}>
+              <button
+                type="button"
+                className={`account-switcher-dropdown__trigger ${testAccounts.some((account) => account.id === activeAccountId) ? 'is-active' : ''}`}
+                onClick={() => setShowTestAccounts((current) => !current)}
+                aria-expanded={showTestAccounts}
+                aria-haspopup="menu"
+              >
+                <span>PR</span>
+                <span><strong>Pruebas bot</strong><small>Flujos temporales</small></span>
+              </button>
+              {showTestAccounts && (
+                <div className="account-switcher-dropdown__menu" role="menu">
+                  {testAccounts.map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      className={account.id === activeAccountId ? 'is-active' : ''}
+                      onClick={() => {
+                        selectAccount(account.id);
+                        setShowTestAccounts(false);
+                      }}
+                      role="menuitem"
+                      title={`${account.name} · ${account.number}`}
+                    >
+                      <span>{account.initials}</span>
+                      <span><strong>{account.name}</strong><small>{account.number}</small></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
         <div className="topbar-user">
           <div><strong>{user.name}</strong><span>{user.username}</span></div>

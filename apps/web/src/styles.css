@@ -40,6 +40,55 @@ button { color: inherit; }
 .account-switcher strong, .account-switcher small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .account-switcher strong { font-size: 11px; }
 .account-switcher small { color: var(--muted); font-size: 9px; }
+.account-switcher-dropdown { position: relative; }
+.account-switcher-dropdown__trigger,
+.account-switcher-dropdown__menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 152px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #9ba79f;
+  padding: 6px 9px;
+  cursor: pointer;
+  text-align: left;
+}
+.account-switcher-dropdown__trigger:hover,
+.account-switcher-dropdown__menu button:hover { background: #151c18; }
+.account-switcher-dropdown__trigger.is-active,
+.account-switcher-dropdown__menu button.is-active { border-color: rgba(182,255,59,.28); background: rgba(182,255,59,.09); color: var(--text); }
+.account-switcher-dropdown__trigger > span:first-child,
+.account-switcher-dropdown__menu button > span:first-child {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #253029;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 900;
+}
+.account-switcher-dropdown__trigger > span:last-child,
+.account-switcher-dropdown__menu button > span:last-child { min-width: 0; display: grid; gap: 1px; }
+.account-switcher-dropdown__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 6;
+  min-width: 220px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #0d120f;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 6px;
+}
 
 .workspace { height: calc(100vh - 68px); display: grid; grid-template-columns: 320px minmax(420px, 1fr) 300px; max-width: 1720px; margin: 0 auto; border-inline: 1px solid var(--line); background: var(--panel); }
 .conversation-column, .contact-column, .thread-column { min-width: 0; min-height: 0; }
@@ -192,6 +241,8 @@ button { color: inherit; }
 @media (max-width: 1100px) {
   .account-switcher button { min-width: 0; }
   .account-switcher button > span:last-child { display: none; }
+  .account-switcher-dropdown__trigger { min-width: 0; }
+  .account-switcher-dropdown__trigger > span:last-child { display: none; }
   .workspace { grid-template-columns: 300px minmax(420px, 1fr); }
   .contact-column { display: none; }
 }
