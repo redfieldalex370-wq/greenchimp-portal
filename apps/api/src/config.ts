@@ -38,18 +38,10 @@ const schema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_DENTAL_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_MUNDO_AVENTURERO_ACCESS_TOKEN: z.string().optional(),
-  WHATSAPP_MUNDO_AVENTURERO_TEST_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_GRAPH_VERSION: z.string().default('v23.0'),
   DEFAULT_PHONE_NUMBER_ID: z.string().default('1240006745865858'),
   DENTAL_PHONE_NUMBER_ID: z.string().default('620774694457849'),
-  MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default(''),
-  MUNDO_AVENTURERO_TEST_ENABLED: booleanFromString,
-  MUNDO_AVENTURERO_TEST_LABEL: z.string().default('Pruebas bot'),
-  MUNDO_AVENTURERO_TEST_PHONE_NUMBER_ID: z.string().default(''),
-  N8N_MUNDO_AVENTURERO_SEND_URL: z.string().url().optional().or(z.literal('')),
-  N8N_MUNDO_AVENTURERO_FLOW_URL: z.string().url().optional().or(z.literal('')),
-  N8N_MUNDO_AVENTURERO_TEST_SEND_URL: z.string().url().optional().or(z.literal('')),
-  N8N_MUNDO_AVENTURERO_TEST_FLOW_URL: z.string().url().optional().or(z.literal(''))
+  MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default('')
 });
 
 export const config = schema.parse(process.env);

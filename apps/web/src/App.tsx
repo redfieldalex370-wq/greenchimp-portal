@@ -14,40 +14,52 @@ type PortalAccount = {
   group?: 'main' | 'test';
 };
 
+type TestBotConfig = {
+  label: string;
+  displayNumber: string;
+  phoneNumberId: string;
+  flowUrl: string;
+  sendUrl: string;
+};
+
 const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
   { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
 ];
 
-const MUNDO_AVENTURERO_ACCOUNT: PortalAccount | null = import.meta.env.VITE_MUNDO_AVENTURERO_PHONE_NUMBER_ID
-  ? {
-      id: import.meta.env.VITE_MUNDO_AVENTURERO_PHONE_NUMBER_ID,
-      name: 'Mundo Aventurero',
-      number: import.meta.env.VITE_MUNDO_AVENTURERO_DISPLAY_NUMBER ?? 'Configurar número',
-      initials: 'MA'
-    }
-  : null;
+const TEST_BOT_STORAGE_KEY = 'gc.portal.test-bot-config';
 
-const MUNDO_AVENTURERO_TEST_ACCOUNT: PortalAccount | null =
-  import.meta.env.VITE_MUNDO_AVENTURERO_TEST_ENABLED === 'true' && import.meta.env.VITE_MUNDO_AVENTURERO_TEST_PHONE_NUMBER_ID
-    ? {
-        id: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_PHONE_NUMBER_ID,
-        name: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_LABEL ?? 'Pruebas bot',
-        number: import.meta.env.VITE_MUNDO_AVENTURERO_TEST_DISPLAY_NUMBER ?? 'Flujo de prueba',
-        initials: 'TB',
-        group: 'test'
-      }
-    : null;
+const DEFAULT_TEST_BOT_CONFIG: TestBotConfig = {
+  label: 'Pruebas bot',
+  displayNumber: 'Flujo temporal',
+  phoneNumberId: '',
+  flowUrl: '',
+  sendUrl: ''
+};
 
-const PORTAL_ACCOUNTS: PortalAccount[] = [
-  ...BASE_PORTAL_ACCOUNTS,
-  ...(MUNDO_AVENTURERO_ACCOUNT ? [MUNDO_AVENTURERO_ACCOUNT] : []),
-  ...(MUNDO_AVENTURERO_TEST_ACCOUNT ? [MUNDO_AVENTURERO_TEST_ACCOUNT] : [])
-];
+function readStoredTestBotConfig(): TestBotConfig {
+  if (typeof window === 'undefined') return DEFAULT_TEST_BOT_CONFIG;
+  try {
+    const raw = window.localStorage.getItem(TEST_BOT_STORAGE_KEY);
+    if (!raw) return DEFAULT_TEST_BOT_CONFIG;
+    const parsed = JSON.parse(raw) as Partial<TestBotConfig>;
+    return {
+      label: parsed.label?.trim() || DEFAULT_TEST_BOT_CONFIG.label,
+      displayNumber: parsed.displayNumber?.trim() || DEFAULT_TEST_BOT_CONFIG.displayNumber,
+      phoneNumberId: parsed.phoneNumberId?.trim() || '',
+      flowUrl: parsed.flowUrl?.trim() || '',
+      sendUrl: parsed.sendUrl?.trim() || ''
+    };
+  } catch {
+    return DEFAULT_TEST_BOT_CONFIG;
+  }
+}
 
 export default function App() {
+  const [testBotConfig, setTestBotConfig] = useState<TestBotConfig>(() => readStoredTestBotConfig());
+  const [draftTestBotConfig, setDraftTestBotConfig] = useState<TestBotConfig>(() => readStoredTestBotConfig());
   const [user, setUser] = useState<PortalUser | null>(null);
-  const [activeAccountId, setActiveAccountId] = useState<string>(PORTAL_ACCOUNTS[0].id);
+  const [activeAccountId, setActiveAccountId] = useState<string>(BASE_PORTAL_ACCOUNTS[0].id);
   const [showTestAccounts, setShowTestAccounts] = useState(false);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -63,10 +75,32 @@ export default function App() {
   const knownConversationKeys = useRef<Set<string> | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
 
+  const testAccount = useMemo<PortalAccount | null>(() => {
+    if (!testBotConfig.phoneNumberId.trim()) return null;
+    return {
+      id: testBotConfig.phoneNumberId.trim(),
+      name: testBotConfig.label.trim() || 'Pruebas bot',
+      number: testBotConfig.displayNumber.trim() || 'Flujo temporal',
+      initials: 'PR',
+      group: 'test'
+    };
+  }, [testBotConfig]);
+
+  const portalAccounts = useMemo(
+    () => [...BASE_PORTAL_ACCOUNTS, ...(testAccount ? [testAccount] : [])],
+    [testAccount]
+  );
+
   const selected = useMemo(
     () => conversations.find((item) => `${item.phone_number_id}:${item.wa_id}` === selectedKey) ?? null,
     [conversations, selectedKey]
   );
+
+  useEffect(() => {
+    if (!portalAccounts.some((account) => account.id === activeAccountId)) {
+      setActiveAccountId(BASE_PORTAL_ACCOUNTS[0].id);
+    }
+  }, [activeAccountId, portalAccounts]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -203,6 +237,19 @@ export default function App() {
     knownConversationKeys.current = null;
   }
 
+  function saveTestBotConfig() {
+    const nextConfig: TestBotConfig = {
+      label: draftTestBotConfig.label.trim() || DEFAULT_TEST_BOT_CONFIG.label,
+      displayNumber: draftTestBotConfig.displayNumber.trim() || DEFAULT_TEST_BOT_CONFIG.displayNumber,
+      phoneNumberId: draftTestBotConfig.phoneNumberId.trim(),
+      flowUrl: draftTestBotConfig.flowUrl.trim(),
+      sendUrl: draftTestBotConfig.sendUrl.trim()
+    };
+    setTestBotConfig(nextConfig);
+    window.localStorage.setItem(TEST_BOT_STORAGE_KEY, JSON.stringify(nextConfig));
+    showToast('Configuración de pruebas guardada');
+  }
+
   async function send(text: string) {
     if (!selected) return;
     setSending(true);
@@ -297,8 +344,8 @@ export default function App() {
   if (booting) return <div className="boot-screen"><div className="brand-orbit">GC</div><p>Abriendo la bandeja…</p></div>;
   if (!user) return <LoginScreen onLogin={login} />;
 
-  const primaryAccounts = PORTAL_ACCOUNTS.filter((account) => account.group !== 'test');
-  const testAccounts = PORTAL_ACCOUNTS.filter((account) => account.group === 'test');
+  const primaryAccounts = portalAccounts.filter((account) => account.group !== 'test');
+  const testAccounts = portalAccounts.filter((account) => account.group === 'test');
 
   return (
     <div className="app-shell">
@@ -320,40 +367,83 @@ export default function App() {
               <span><strong>{account.name}</strong><small>{account.number}</small></span>
             </button>
           ))}
-          {testAccounts.length > 0 && (
-            <div className={`account-switcher-dropdown ${showTestAccounts ? 'is-open' : ''}`}>
-              <button
-                type="button"
-                className={`account-switcher-dropdown__trigger ${testAccounts.some((account) => account.id === activeAccountId) ? 'is-active' : ''}`}
-                onClick={() => setShowTestAccounts((current) => !current)}
-                aria-expanded={showTestAccounts}
-                aria-haspopup="menu"
-              >
-                <span>PR</span>
-                <span><strong>Pruebas bot</strong><small>Flujos temporales</small></span>
-              </button>
-              {showTestAccounts && (
-                <div className="account-switcher-dropdown__menu" role="menu">
-                  {testAccounts.map((account) => (
-                    <button
-                      key={account.id}
-                      type="button"
-                      className={account.id === activeAccountId ? 'is-active' : ''}
-                      onClick={() => {
-                        selectAccount(account.id);
-                        setShowTestAccounts(false);
-                      }}
-                      role="menuitem"
-                      title={`${account.name} · ${account.number}`}
-                    >
-                      <span>{account.initials}</span>
-                      <span><strong>{account.name}</strong><small>{account.number}</small></span>
-                    </button>
-                  ))}
+          <div className={`account-switcher-dropdown ${showTestAccounts ? 'is-open' : ''}`}>
+            <button
+              type="button"
+              className={`account-switcher-dropdown__trigger ${testAccounts.some((account) => account.id === activeAccountId) ? 'is-active' : ''}`}
+              onClick={() => setShowTestAccounts((current) => !current)}
+              aria-expanded={showTestAccounts}
+              aria-haspopup="menu"
+            >
+              <span>PR</span>
+              <span><strong>Pruebas bot</strong><small>Flujos temporales</small></span>
+            </button>
+            {showTestAccounts && (
+              <div className="account-switcher-dropdown__menu" role="menu">
+                <div className="account-switcher-dropdown__config">
+                  <label>
+                    <span>Nombre</span>
+                    <input
+                      value={draftTestBotConfig.label}
+                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, label: event.target.value }))}
+                      placeholder="Pruebas bot"
+                    />
+                  </label>
+                  <label>
+                    <span>Número visible</span>
+                    <input
+                      value={draftTestBotConfig.displayNumber}
+                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, displayNumber: event.target.value }))}
+                      placeholder="Flujo temporal"
+                    />
+                  </label>
+                  <label>
+                    <span>Phone Number ID</span>
+                    <input
+                      value={draftTestBotConfig.phoneNumberId}
+                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, phoneNumberId: event.target.value }))}
+                      placeholder="620..."
+                    />
+                  </label>
+                  <label>
+                    <span>URL del flujo</span>
+                    <input
+                      value={draftTestBotConfig.flowUrl}
+                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, flowUrl: event.target.value }))}
+                      placeholder="https://n8n.../workflow/..."
+                    />
+                  </label>
+                  <label>
+                    <span>URL de envío</span>
+                    <input
+                      value={draftTestBotConfig.sendUrl}
+                      onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, sendUrl: event.target.value }))}
+                      placeholder="https://n8n.../webhook/..."
+                    />
+                  </label>
+                  <button type="button" className="account-switcher-dropdown__save" onClick={saveTestBotConfig}>
+                    Guardar prueba
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
+                {testAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    type="button"
+                    className={account.id === activeAccountId ? 'is-active' : ''}
+                    onClick={() => {
+                      selectAccount(account.id);
+                      setShowTestAccounts(false);
+                    }}
+                    role="menuitem"
+                    title={`${account.name} · ${account.number}`}
+                  >
+                    <span>{account.initials}</span>
+                    <span><strong>{account.name}</strong><small>{account.number}</small></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </nav>
         <div className="topbar-user">
           <div><strong>{user.name}</strong><span>{user.username}</span></div>

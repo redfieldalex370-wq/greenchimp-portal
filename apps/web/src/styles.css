@@ -80,7 +80,7 @@ button { color: inherit; }
   top: calc(100% + 8px);
   right: 0;
   z-index: 6;
-  min-width: 220px;
+  min-width: 280px;
   padding: 7px;
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -88,6 +88,43 @@ button { color: inherit; }
   box-shadow: var(--shadow);
   display: grid;
   gap: 6px;
+}
+.account-switcher-dropdown__config {
+  display: grid;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid #1f2823;
+  margin-bottom: 4px;
+}
+.account-switcher-dropdown__config label {
+  display: grid;
+  gap: 4px;
+}
+.account-switcher-dropdown__config span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.account-switcher-dropdown__config input {
+  width: 100%;
+  border: 1px solid #303b34;
+  border-radius: 9px;
+  background: #151b17;
+  color: var(--text);
+  padding: 9px 10px;
+  outline: 0;
+}
+.account-switcher-dropdown__config input:focus {
+  border-color: #5a6d4e;
+  box-shadow: 0 0 0 3px rgba(182,255,59,.05);
+}
+.account-switcher-dropdown__save {
+  border: 0;
+  border-radius: 10px;
+  background: var(--lime);
+  color: #11160e;
+  font-weight: 900;
+  padding: 10px 12px;
+  cursor: pointer;
 }
 
 .workspace { height: calc(100vh - 68px); display: grid; grid-template-columns: 320px minmax(420px, 1fr) 300px; max-width: 1720px; margin: 0 auto; border-inline: 1px solid var(--line); background: var(--panel); }
