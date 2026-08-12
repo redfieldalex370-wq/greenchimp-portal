@@ -10,6 +10,7 @@ import { config } from './config.js';
 import { createSession, destroySession, getSessionUser, requireAuth, validateCredentials } from './auth.js';
 import {
   addDemoOutgoingMessage,
+  addOutgoingTextMessage,
   addOutgoingMediaMessage,
   deleteConversation,
   getMessageMedia,
@@ -301,7 +302,22 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async 
       text: input.text,
       actor
     });
-    res.status(201).json({ ok: true, result });
+
+    const rawMessageId =
+      typeof result === 'object' && result && 'messages' in result && Array.isArray((result as { messages?: unknown[] }).messages)
+        ? (result as { messages?: Array<{ id?: string }> }).messages?.[0]?.id
+        : undefined;
+
+    const message = await addOutgoingTextMessage({
+      phoneNumberId: params.phoneNumberId,
+      waId: params.waId,
+      actor,
+      text: input.text,
+      messageId: typeof rawMessageId === 'string' ? rawMessageId : undefined,
+      status: 'sent'
+    });
+
+    res.status(201).json({ ok: true, result, message });
   } catch (error) {
     next(error);
   }

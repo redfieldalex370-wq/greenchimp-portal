@@ -15,9 +15,28 @@ export const pool = config.DEMO_MODE
 
 export async function query<T extends pg.QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
   if (!pool) {
-    throw new Error('La base de datos no estÃ¡ disponible en modo demostraciÃ³n.');
+    throw new Error('La base de datos no está disponible en modo demostración.');
   }
 
   const result = await pool.query<T>(text, values);
   return result.rows;
+}
+
+export async function withTransaction<T>(callback: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  if (!pool) {
+    throw new Error('La base de datos no está disponible en modo demostración.');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
