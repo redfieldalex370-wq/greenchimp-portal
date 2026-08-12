@@ -3,12 +3,66 @@ import { query, withTransaction } from './db.js';
 import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
-async function relationExists(client: { query: (text: string, values?: unknown[]) => Promise<{ rows: Array<{ exists: boolean }> }> }, relationName: string) {
-  const result = await client.query(
+type DbClient = {
+  query: <T extends Record<string, unknown> = Record<string, unknown>>(text: string, values?: unknown[]) => Promise<{ rows: T[] }>;
+};
+
+async function relationExists(client: DbClient, relationName: string) {
+  const result = await client.query<{ exists: boolean }>(
     `SELECT to_regclass($1) IS NOT NULL AS exists`,
     [relationName]
   );
   return Boolean(result.rows[0]?.exists);
+}
+
+async function collectStateSessionKeys(
+  client: DbClient,
+  waId: string
+) {
+  const keys = new Set<string>([waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]);
+
+  if (await relationExists(client, 'public.gc_leads_estado')) {
+    const result = await client.query(
+      `SELECT usuario_id::text AS usuario_id
+         FROM public.gc_leads_estado
+        WHERE chat_id = $1
+           OR manychat_id = $1
+           OR telefono = $1`,
+      [waId]
+    );
+
+    for (const row of result.rows) {
+      const usuarioId = typeof row.usuario_id === 'string' ? row.usuario_id.trim() : '';
+      if (usuarioId) {
+        keys.add(usuarioId);
+        keys.add(`${usuarioId}_lt`);
+        keys.add(`${usuarioId}_ma`);
+        keys.add(`${usuarioId}_esp`);
+      }
+    }
+  }
+
+  if (await relationExists(client, 'public.wa_clientes_estado')) {
+    const result = await client.query(
+      `SELECT usuario_id::text AS usuario_id
+         FROM public.wa_clientes_estado
+        WHERE whatsapp_phone = $1
+           OR subscriber_id = $1`,
+      [waId]
+    );
+
+    for (const row of result.rows) {
+      const usuarioId = typeof row.usuario_id === 'string' ? row.usuario_id.trim() : '';
+      if (usuarioId) {
+        keys.add(usuarioId);
+        keys.add(`${usuarioId}_lt`);
+        keys.add(`${usuarioId}_ma`);
+        keys.add(`${usuarioId}_esp`);
+      }
+    }
+  }
+
+  return [...keys];
 }
 
 export async function listConversations(search = '', phoneNumberId = ''): Promise<Conversation[]> {
@@ -121,7 +175,7 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
 
     if (existing.rowCount === 0) return false;
 
-    const sessionKeys = [waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`];
+    const sessionKeys = await collectStateSessionKeys(client, waId);
 
     await client.query(
       `DELETE FROM public.wa_mensajes
@@ -174,6 +228,25 @@ export async function deleteConversation(phoneNumberId: string, waId: string): P
         `DELETE FROM public.bot_session
           WHERE session_key = ANY($1::text[])`,
         [sessionKeys]
+      );
+    }
+
+    if (await relationExists(client, 'public.gc_leads_estado')) {
+      await client.query(
+        `DELETE FROM public.gc_leads_estado
+          WHERE chat_id = $1
+             OR manychat_id = $1
+             OR telefono = $1`,
+        [waId]
+      );
+    }
+
+    if (await relationExists(client, 'public.wa_clientes_estado')) {
+      await client.query(
+        `DELETE FROM public.wa_clientes_estado
+          WHERE whatsapp_phone = $1
+             OR subscriber_id = $1`,
+        [waId]
       );
     }
 
