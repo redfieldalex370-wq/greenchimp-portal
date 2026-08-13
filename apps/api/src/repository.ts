@@ -88,7 +88,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
-  const conversations = await query<Conversation>(
+  const conversations: Conversation[] = await query<Conversation>(
     `SELECT phone_number_id,
             wa_id,
             NULL::text AS usuario_id,
@@ -111,9 +111,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       LIMIT 100`,
     [phoneNumberId.trim(), search.trim()]
   );
-
-  if (conversations.length === 0) return conversations;
-
+  const term = search.trim().toLowerCase();
   const waIds = [...new Set(conversations.map((item) => item.wa_id).filter(Boolean))];
   const usuarioIdByWaId = new Map<string, string>();
 
@@ -180,11 +178,87 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       }
     }
   }
-
-  return conversations.map((item) => ({
+  let enriched: Conversation[] = conversations.map((item) => ({
     ...item,
     usuario_id: usuarioIdByWaId.get(item.wa_id) ?? null
   }));
+
+  if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
+    const missingRows = await query<{
+      usuario_id: string | null;
+      wa_id: string;
+      nombre: string | null;
+      preview: string | null;
+      updated_at: string | null;
+      fuente: string | null;
+    }>(
+      `SELECT
+          usuario_id::text AS usuario_id,
+          COALESCE(NULLIF(chat_id, ''), NULLIF(manychat_id, ''), NULLIF(telefono, '')) AS wa_id,
+          COALESCE(NULLIF(nombre_contacto, ''), 'Sin nombre') AS nombre,
+          COALESCE(NULLIF(ultimo_mensaje_usuario, ''), NULLIF(ultima_respuesta_bot, ''), 'Nuevo mensaje') AS preview,
+          COALESCE(fecha_actualizacion, fecha_creacion, NOW())::text AS updated_at,
+          CASE
+            WHEN COALESCE(fuente, '') <> '' THEN fuente
+            ELSE 'WhatsApp Directo'
+          END AS fuente
+       FROM public.gc_leads_estado
+      WHERE COALESCE(borrado_en_portal, false) = false
+        AND COALESCE(NULLIF(chat_id, ''), NULLIF(manychat_id, ''), NULLIF(telefono, '')) IS NOT NULL
+      ORDER BY COALESCE(fecha_actualizacion, fecha_creacion, NOW()) DESC
+      LIMIT 300`
+    );
+
+    const knownKeys = new Set(enriched.map((item) => conversationKeyFromValues(item.phone_number_id, item.wa_id, item.usuario_id)));
+
+    const inferredPhoneNumberId = phoneNumberId.trim();
+    const missingConversations = missingRows
+      .map((row) => {
+        const waId = (row.wa_id || '').trim();
+        const usuarioId = (row.usuario_id || '').trim() || null;
+        if (!waId) return null;
+        const inferredPhone = inferredPhoneNumberId || inferPhoneNumberIdFromWaId(waId);
+        if (!inferredPhone) return null;
+        const key = conversationKeyFromValues(inferredPhone, waId, usuarioId);
+        if (knownKeys.has(key)) return null;
+        const nombre = (row.nombre || 'Sin nombre').trim() || 'Sin nombre';
+        if (term && !nombre.toLowerCase().includes(term) && !waId.toLowerCase().includes(term)) return null;
+        const conversation: Conversation = {
+          phone_number_id: inferredPhone,
+          wa_id: waId,
+          usuario_id: usuarioId,
+          nombre,
+          ultimo_texto: (row.preview || 'Nuevo mensaje').trim() || 'Nuevo mensaje',
+          ultimo_mensaje: row.updated_at || new Date().toISOString(),
+          no_leidos: 1,
+          bot_activo: true,
+          ventana_abierta: true,
+          ventana_expira: null,
+          tipo_ventana: 'usuario_24h',
+          fuente: (row.fuente || 'WhatsApp Directo').trim() || 'WhatsApp Directo',
+          pausado_por: null,
+          pausado_en: null
+        };
+        return conversation;
+      })
+      .filter((item): item is Conversation => item !== null);
+
+    enriched = [...missingConversations, ...enriched]
+      .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje))
+      .slice(0, 100);
+  }
+
+  return enriched;
+}
+
+function conversationKeyFromValues(phoneNumberId: string, waId: string, usuarioId?: string | null) {
+  const usuario = usuarioId?.trim();
+  return usuario ? `${phoneNumberId}:uid:${usuario}` : `${phoneNumberId}:wa:${waId}`;
+}
+
+function inferPhoneNumberIdFromWaId(waId: string) {
+  if (config.DENTAL_PHONE_NUMBER_ID && waId.startsWith('52') === false) return config.DENTAL_PHONE_NUMBER_ID;
+  return config.DEFAULT_PHONE_NUMBER_ID || config.DENTAL_PHONE_NUMBER_ID || '';
 }
 
 export async function listMessages(phoneNumberId: string, waId: string, usuarioId?: string | null): Promise<Message[]> {
@@ -209,7 +283,17 @@ export async function listMessages(phoneNumberId: string, waId: string, usuarioI
               creado_en
          FROM public.wa_mensajes
         WHERE (
-          ($3 <> '' AND usuario_id::text = $3)
+          (
+            $3 <> ''
+            AND (
+              usuario_id::text = $3
+              OR (
+                usuario_id IS NULL
+                AND phone_number_id = $1
+                AND wa_id = $2
+              )
+            )
+          )
           OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
         )
         ORDER BY creado_en ASC, id ASC
@@ -287,7 +371,17 @@ export async function markRead(phoneNumberId: string, waId: string, usuarioId?: 
         SET no_leidos = 0,
             actualizado_en = NOW()
       WHERE (
-        ($3 <> '' AND usuario_id::text = $3)
+        (
+          $3 <> ''
+          AND (
+            usuario_id::text = $3
+            OR (
+              usuario_id IS NULL
+              AND phone_number_id = $1
+              AND wa_id = $2
+            )
+          )
+        )
         OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
       )`,
     [phoneNumberId, waId, usuarioIdTrimmed]
@@ -439,7 +533,17 @@ export async function setBotActive(
             pausado_por = CASE WHEN $3 THEN NULL ELSE $4 END,
             actualizado_en = NOW()
       WHERE (
-        ($5 <> '' AND usuario_id::text = $5)
+        (
+          $5 <> ''
+          AND (
+            usuario_id::text = $5
+            OR (
+              usuario_id IS NULL
+              AND phone_number_id = $1
+              AND wa_id = $2
+            )
+          )
+        )
         OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
       )`,
     [phoneNumberId, waId, active, actor, usuarioIdTrimmed]
@@ -554,7 +658,17 @@ export async function addOutgoingTextMessage(input: {
               pausado_por = $4,
               actualizado_en = NOW()
         WHERE (
-          ($5 <> '' AND usuario_id::text = $5)
+          (
+            $5 <> ''
+            AND (
+              usuario_id::text = $5
+              OR (
+                usuario_id IS NULL
+                AND phone_number_id = $1
+                AND wa_id = $2
+              )
+            )
+          )
           OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
         )`,
       [input.phoneNumberId, input.waId, storedText, input.actor, usuarioIdTrimmed]
@@ -676,7 +790,17 @@ export async function addOutgoingMediaMessage(input: {
               pausado_por = $5,
               actualizado_en = NOW()
         WHERE (
-          ($6 <> '' AND usuario_id::text = $6)
+          (
+            $6 <> ''
+            AND (
+              usuario_id::text = $6
+              OR (
+                usuario_id IS NULL
+                AND phone_number_id = $1
+                AND wa_id = $2
+              )
+            )
+          )
           OR ($6 = '' AND phone_number_id = $1 AND wa_id = $2)
         )`,
       [input.phoneNumberId, input.waId, storedText, input.type, input.actor, usuarioIdTrimmed]
