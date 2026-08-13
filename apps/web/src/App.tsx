@@ -263,8 +263,9 @@ export default function App() {
     }
     void refreshMessages(selected);
     void api.markRead(selected).then(() => {
+      const selectedIdentity = conversationKey(selected);
       setConversations((items) => items.map((item) =>
-        item.wa_id === selected.wa_id && item.phone_number_id === selected.phone_number_id
+        conversationKey(item) === selectedIdentity
           ? { ...item, no_leidos: 0 }
           : item
       ));
@@ -272,7 +273,7 @@ export default function App() {
 
     const timer = window.setInterval(() => void refreshMessages(selected), 5000);
     return () => window.clearInterval(timer);
-  }, [selected?.phone_number_id, selected?.wa_id, refreshMessages, isTestMode, testConversation]);
+  }, [selected?.phone_number_id, selected?.wa_id, selected?.usuario_id, refreshMessages, isTestMode, testConversation]);
 
   async function login(username: string, password: string) {
     const response = await api.login(username, password);

@@ -173,14 +173,17 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   }));
 }
 
-export async function listMessages(phoneNumberId: string, waId: string): Promise<Message[]> {
+export async function listMessages(phoneNumberId: string, waId: string, usuarioId?: string | null): Promise<Message[]> {
   if (config.DEMO_MODE) return demoMessages.get(demoKey(phoneNumberId, waId)) ?? [];
+
+  const usuarioIdTrimmed = usuarioId?.trim() || '';
 
   return query<Message>(
     `SELECT id::text,
             COALESCE(message_id, '') AS message_id,
             phone_number_id,
             wa_id,
+            usuario_id::text AS usuario_id,
             direccion,
             COALESCE(autor, CASE WHEN direccion = 'out' THEN 'humano' ELSE 'usuario' END) AS autor,
             COALESCE(tipo, 'text') AS tipo,
@@ -189,10 +192,13 @@ export async function listMessages(phoneNumberId: string, waId: string): Promise
             COALESCE(estado, 'received') AS estado,
             creado_en
        FROM public.wa_mensajes
-      WHERE phone_number_id = $1 AND wa_id = $2
+      WHERE (
+        ($3 <> '' AND usuario_id::text = $3)
+        OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
+      )
       ORDER BY creado_en ASC, id ASC
       LIMIT 500`,
-    [phoneNumberId, waId]
+    [phoneNumberId, waId, usuarioIdTrimmed]
   );
 }
 
@@ -219,18 +225,22 @@ export async function getMessageMedia(messageId: string): Promise<Pick<Message, 
   return rows[0] ?? null;
 }
 
-export async function markRead(phoneNumberId: string, waId: string) {
+export async function markRead(phoneNumberId: string, waId: string, usuarioId?: string | null) {
   if (config.DEMO_MODE) {
     updateDemoConversation(phoneNumberId, waId, (item) => ({ ...item, no_leidos: 0 }));
     return;
   }
 
+  const usuarioIdTrimmed = usuarioId?.trim() || '';
   await query(
     `UPDATE public.wa_conversaciones
         SET no_leidos = 0,
             actualizado_en = NOW()
-      WHERE phone_number_id = $1 AND wa_id = $2`,
-    [phoneNumberId, waId]
+      WHERE (
+        ($3 <> '' AND usuario_id::text = $3)
+        OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
+      )`,
+    [phoneNumberId, waId, usuarioIdTrimmed]
   );
 }
 
@@ -344,7 +354,8 @@ export async function setBotActive(
   phoneNumberId: string,
   waId: string,
   active: boolean,
-  actor: string
+  actor: string,
+  usuarioId?: string | null
 ) {
   if (config.DEMO_MODE) {
     updateDemoConversation(phoneNumberId, waId, (item) => ({
@@ -356,14 +367,18 @@ export async function setBotActive(
     return;
   }
 
+  const usuarioIdTrimmed = usuarioId?.trim() || '';
   await query(
     `UPDATE public.wa_conversaciones
         SET bot_activo = $3,
             pausado_en = CASE WHEN $3 THEN NULL ELSE NOW() END,
             pausado_por = CASE WHEN $3 THEN NULL ELSE $4 END,
             actualizado_en = NOW()
-      WHERE phone_number_id = $1 AND wa_id = $2`,
-    [phoneNumberId, waId, active, actor]
+      WHERE (
+        ($5 <> '' AND usuario_id::text = $5)
+        OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
+      )`,
+    [phoneNumberId, waId, active, actor, usuarioIdTrimmed]
   );
 }
 
@@ -402,6 +417,7 @@ export function addDemoOutgoingMessage(
 export async function addOutgoingTextMessage(input: {
   phoneNumberId: string;
   waId: string;
+  usuarioId?: string | null;
   actor: string;
   text: string;
   messageId?: string;
@@ -413,19 +429,22 @@ export async function addOutgoingTextMessage(input: {
   }
 
   const generatedMessageId = input.messageId?.trim() || `wamid.portal.text.${Date.now()}`;
+  const usuarioIdTrimmed = input.usuarioId?.trim() || '';
 
   const rows = await query<Message>(
     `INSERT INTO public.wa_mensajes
-       (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-     VALUES ($1, $2, 'out', $3, 'text', $4, NULL, $5, $6, NOW())
+       (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+     VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, 'text', $5, NULL, $6, $7, NOW())
      ON CONFLICT (message_id) DO UPDATE
        SET estado = EXCLUDED.estado,
            texto = EXCLUDED.texto,
-           autor = EXCLUDED.autor
+           autor = EXCLUDED.autor,
+           usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
      RETURNING id::text,
                COALESCE(message_id, '') AS message_id,
                phone_number_id,
                wa_id,
+               usuario_id::text AS usuario_id,
                direccion,
                COALESCE(autor, 'humano') AS autor,
                COALESCE(tipo, 'text') AS tipo,
@@ -433,7 +452,7 @@ export async function addOutgoingTextMessage(input: {
                media_id,
                COALESCE(estado, 'sent') AS estado,
                creado_en`,
-    [input.phoneNumberId, input.waId, input.actor, storedText, generatedMessageId, input.status || 'sent']
+    [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, storedText, generatedMessageId, input.status || 'sent']
   );
 
   await query(
@@ -444,8 +463,11 @@ export async function addOutgoingTextMessage(input: {
             pausado_en = NOW(),
             pausado_por = $4,
             actualizado_en = NOW()
-      WHERE phone_number_id = $1 AND wa_id = $2`,
-    [input.phoneNumberId, input.waId, storedText, input.actor]
+      WHERE (
+        ($5 <> '' AND usuario_id::text = $5)
+        OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
+      )`,
+    [input.phoneNumberId, input.waId, storedText, input.actor, usuarioIdTrimmed]
   );
 
   return rows[0] ?? null;
@@ -454,6 +476,7 @@ export async function addOutgoingTextMessage(input: {
 export async function addOutgoingMediaMessage(input: {
   phoneNumberId: string;
   waId: string;
+  usuarioId?: string | null;
   actor: string;
   type: string;
   mediaId: string;
@@ -488,19 +511,22 @@ export async function addOutgoingMediaMessage(input: {
     return message;
   }
 
+  const usuarioIdTrimmed = input.usuarioId?.trim() || '';
   const rows = await query<Message>(
     `INSERT INTO public.wa_mensajes
-       (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-     VALUES ($1, $2, 'out', $3, $4, $5, $6, $7, 'sent', NOW())
+       (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+     VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, $5, $6, $7, $8, 'sent', NOW())
      ON CONFLICT (message_id) DO UPDATE
        SET estado = EXCLUDED.estado,
            media_id = EXCLUDED.media_id,
            texto = EXCLUDED.texto,
-           autor = EXCLUDED.autor
+           autor = EXCLUDED.autor,
+           usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
      RETURNING id::text,
                COALESCE(message_id, '') AS message_id,
                phone_number_id,
                wa_id,
+               usuario_id::text AS usuario_id,
                direccion,
                COALESCE(autor, 'humano') AS autor,
                COALESCE(tipo, 'text') AS tipo,
@@ -508,7 +534,7 @@ export async function addOutgoingMediaMessage(input: {
                media_id,
                COALESCE(estado, 'sent') AS estado,
                creado_en`,
-    [input.phoneNumberId, input.waId, input.actor, input.type, storedText, input.mediaId, input.messageId]
+    [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, input.type, storedText, input.mediaId, input.messageId]
   );
 
   await query(
@@ -519,8 +545,11 @@ export async function addOutgoingMediaMessage(input: {
             pausado_en = NOW(),
             pausado_por = $5,
             actualizado_en = NOW()
-      WHERE phone_number_id = $1 AND wa_id = $2`,
-    [input.phoneNumberId, input.waId, storedText, input.type, input.actor]
+      WHERE (
+        ($6 <> '' AND usuario_id::text = $6)
+        OR ($6 = '' AND phone_number_id = $1 AND wa_id = $2)
+      )`,
+    [input.phoneNumberId, input.waId, storedText, input.type, input.actor, usuarioIdTrimmed]
   );
   return rows[0] ?? null;
 }

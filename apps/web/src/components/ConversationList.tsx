@@ -1,6 +1,11 @@
 import type { Conversation } from '../types';
 import { initials, relativeTime } from '../utils';
 
+function conversationIdentity(conversation: Conversation) {
+  const usuarioId = conversation.usuario_id?.trim();
+  return usuarioId ? `${conversation.phone_number_id}:uid:${usuarioId}` : `${conversation.phone_number_id}:wa:${conversation.wa_id}`;
+}
+
 export function ConversationList({
   conversations,
   selected,
@@ -38,10 +43,10 @@ export function ConversationList({
 
       <div className="conversation-list" aria-busy={loading}>
         {conversations.map((conversation) => {
-          const active = selected?.wa_id === conversation.wa_id && selected.phone_number_id === conversation.phone_number_id;
+          const active = selected ? conversationIdentity(selected) === conversationIdentity(conversation) : false;
           return (
             <button
-              key={`${conversation.phone_number_id}:${conversation.wa_id}`}
+              key={conversationIdentity(conversation)}
               className={`conversation-row ${active ? 'is-active' : ''} ${conversation.ventana_abierta ? '' : 'is-muted'}`}
               onClick={() => onSelect(conversation)}
             >

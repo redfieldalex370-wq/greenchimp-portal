@@ -175,9 +175,10 @@ app.get('/api/conversations', requireAuth, async (req, res, next) => {
 app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
+    const usuarioId = typeof req.query.usuario_id === 'string' ? req.query.usuario_id.trim() : '';
     res.json({
       ok: true,
-      messages: await listMessages(params.phoneNumberId, params.waId)
+      messages: await listMessages(params.phoneNumberId, params.waId, usuarioId)
     });
   } catch (error) {
     next(error);
@@ -259,7 +260,8 @@ app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) =>
 app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
-    await markRead(params.phoneNumberId, params.waId);
+    const input = z.object({ usuario_id: z.string().trim().optional().nullable() }).parse(req.body ?? {});
+    await markRead(params.phoneNumberId, params.waId, input.usuario_id);
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -269,10 +271,10 @@ app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, async (req
 app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
-    const input = z.object({ active: z.boolean() }).parse(req.body);
+    const input = z.object({ active: z.boolean(), usuario_id: z.string().trim().optional().nullable() }).parse(req.body);
     const actor = res.locals.user.name as string;
 
-    await setBotActive(params.phoneNumberId, params.waId, input.active, actor);
+    await setBotActive(params.phoneNumberId, params.waId, input.active, actor, input.usuario_id);
 
     res.json({ ok: true });
   } catch (error) {
@@ -283,7 +285,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, async (req,
 app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
-    const input = z.object({ text: z.string().trim().min(1).max(4096) }).parse(req.body);
+    const input = z.object({ text: z.string().trim().min(1).max(4096), usuario_id: z.string().trim().optional().nullable() }).parse(req.body);
     const actor = res.locals.user.name as string;
 
     if (config.DEMO_MODE) {
@@ -312,6 +314,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async 
     const message = await addOutgoingTextMessage({
       phoneNumberId: params.phoneNumberId,
       waId: params.waId,
+      usuarioId: input.usuario_id,
       actor,
       text: input.text,
       messageId: typeof rawMessageId === 'string' ? rawMessageId : undefined,
@@ -329,7 +332,8 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({
       type: z.enum(['image', 'audio', 'video', 'sticker']),
-      caption: z.string().trim().max(1024).optional().default('')
+      caption: z.string().trim().max(1024).optional().default(''),
+      usuario_id: z.string().trim().optional().default('')
     }).parse(req.body);
     const file = req.file;
     if (!file) {
@@ -380,6 +384,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
     const message = await addOutgoingMediaMessage({
       phoneNumberId: params.phoneNumberId,
       waId: params.waId,
+        usuarioId: input.usuario_id,
         actor,
         type: input.type,
         mediaId,
@@ -399,7 +404,8 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAut
     const input = z.object({
       type: z.enum(['image', 'audio', 'video', 'sticker']),
       media_id: z.string().trim().min(1).max(256),
-      caption: z.string().trim().max(1024).optional().default('')
+      caption: z.string().trim().max(1024).optional().default(''),
+      usuario_id: z.string().trim().optional().nullable()
     }).parse(req.body);
     const actor = res.locals.user.name as string;
 
@@ -420,6 +426,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAut
     const message = await addOutgoingMediaMessage({
       phoneNumberId: params.phoneNumberId,
       waId: params.waId,
+      usuarioId: input.usuario_id,
       actor,
       type: input.type,
       mediaId: input.media_id,

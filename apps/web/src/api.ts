@@ -2,6 +2,11 @@ import type { Conversation, Message, PortalUser } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE ?? '/api';
 
+function conversationQuery(conversation: Conversation) {
+  const usuarioId = conversation.usuario_id?.trim();
+  return usuarioId ? `?usuario_id=${encodeURIComponent(usuarioId)}` : '';
+}
+
 type ApiErrorPayload = { error?: string; details?: unknown };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -38,17 +43,17 @@ export const api = {
     ),
   messages: (conversation: Conversation) =>
     request<{ ok: true; messages: Message[] }>(
-      `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages`
+      `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages${conversationQuery(conversation)}`
     ),
   markRead: (conversation: Conversation) =>
     request<{ ok: true }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/read`,
-      { method: 'POST' }
+      { method: 'POST', body: JSON.stringify({ usuario_id: conversation.usuario_id ?? null }) }
     ),
   setBot: (conversation: Conversation, active: boolean) =>
     request<{ ok: true }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/bot`,
-      { method: 'POST', body: JSON.stringify({ active }) }
+      { method: 'POST', body: JSON.stringify({ active, usuario_id: conversation.usuario_id ?? null }) }
     ),
   deleteConversation: (conversation: Conversation) =>
     request<{ ok: true }>(
@@ -61,7 +66,7 @@ export const api = {
   send: (conversation: Conversation, text: string) =>
     request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages`,
-      { method: 'POST', body: JSON.stringify({ text }) }
+      { method: 'POST', body: JSON.stringify({ text, usuario_id: conversation.usuario_id ?? null }) }
     ),
   sendMedia: (conversation: Conversation, type: string, file: File, caption = '') => {
     const body = new FormData();
@@ -70,13 +75,16 @@ export const api = {
     body.set('file', file);
     return request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media`,
-      { method: 'POST', body }
+      (() => {
+        body.set('usuario_id', conversation.usuario_id ?? '');
+        return { method: 'POST', body };
+      })()
     )
   },
   sendMediaById: (conversation: Conversation, type: string, mediaId: string, caption = '') =>
     request<{ ok: true; message?: Message }>(
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media-id`,
-      { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption }) }
+      { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption, usuario_id: conversation.usuario_id ?? null }) }
     ),
   testBotSend: (input: { sendUrl: string; flowUrl?: string; text: string; actor: string; phoneNumberId: string }) =>
     request<{ ok: true; reply: string; raw?: unknown }>('/test-bot/send', {
