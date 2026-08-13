@@ -15,6 +15,20 @@ async function relationExists(client: DbClient, relationName: string) {
   return Boolean(result.rows[0]?.exists);
 }
 
+async function columnExists(client: DbClient, tableName: string, columnName: string) {
+  const result = await client.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+     ) AS exists`,
+    [tableName, columnName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
 async function collectStateSessionKeys(
   client: DbClient,
   waId: string
@@ -177,13 +191,39 @@ export async function listMessages(phoneNumberId: string, waId: string, usuarioI
   if (config.DEMO_MODE) return demoMessages.get(demoKey(phoneNumberId, waId)) ?? [];
 
   const usuarioIdTrimmed = usuarioId?.trim() || '';
+  const hasUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
+
+  if (hasUsuarioId) {
+    return query<Message>(
+      `SELECT id::text,
+              COALESCE(message_id, '') AS message_id,
+              phone_number_id,
+              wa_id,
+              usuario_id::text AS usuario_id,
+              direccion,
+              COALESCE(autor, CASE WHEN direccion = 'out' THEN 'humano' ELSE 'usuario' END) AS autor,
+              COALESCE(tipo, 'text') AS tipo,
+              COALESCE(texto, '') AS texto,
+              media_id,
+              COALESCE(estado, 'received') AS estado,
+              creado_en
+         FROM public.wa_mensajes
+        WHERE (
+          ($3 <> '' AND usuario_id::text = $3)
+          OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
+        )
+        ORDER BY creado_en ASC, id ASC
+        LIMIT 500`,
+      [phoneNumberId, waId, usuarioIdTrimmed]
+    );
+  }
 
   return query<Message>(
     `SELECT id::text,
             COALESCE(message_id, '') AS message_id,
             phone_number_id,
             wa_id,
-            usuario_id::text AS usuario_id,
+            NULL::text AS usuario_id,
             direccion,
             COALESCE(autor, CASE WHEN direccion = 'out' THEN 'humano' ELSE 'usuario' END) AS autor,
             COALESCE(tipo, 'text') AS tipo,
@@ -192,13 +232,10 @@ export async function listMessages(phoneNumberId: string, waId: string, usuarioI
             COALESCE(estado, 'received') AS estado,
             creado_en
        FROM public.wa_mensajes
-      WHERE (
-        ($3 <> '' AND usuario_id::text = $3)
-        OR ($3 = '' AND phone_number_id = $1 AND wa_id = $2)
-      )
+      WHERE phone_number_id = $1 AND wa_id = $2
       ORDER BY creado_en ASC, id ASC
       LIMIT 500`,
-    [phoneNumberId, waId, usuarioIdTrimmed]
+    [phoneNumberId, waId]
   );
 }
 
@@ -232,6 +269,19 @@ export async function markRead(phoneNumberId: string, waId: string, usuarioId?: 
   }
 
   const usuarioIdTrimmed = usuarioId?.trim() || '';
+  const hasUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+
+  if (!hasUsuarioId) {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET no_leidos = 0,
+              actualizado_en = NOW()
+        WHERE phone_number_id = $1 AND wa_id = $2`,
+      [phoneNumberId, waId]
+    );
+    return;
+  }
+
   await query(
     `UPDATE public.wa_conversaciones
         SET no_leidos = 0,
@@ -367,6 +417,20 @@ export async function setBotActive(
     return;
   }
 
+  const hasUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  if (!hasUsuarioId) {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET bot_activo = $3,
+              pausado_en = CASE WHEN $3 THEN NULL ELSE NOW() END,
+              pausado_por = CASE WHEN $3 THEN NULL ELSE $4 END,
+              actualizado_en = NOW()
+        WHERE phone_number_id = $1 AND wa_id = $2`,
+      [phoneNumberId, waId, active, actor]
+    );
+    return;
+  }
+
   const usuarioIdTrimmed = usuarioId?.trim() || '';
   await query(
     `UPDATE public.wa_conversaciones
@@ -430,45 +494,84 @@ export async function addOutgoingTextMessage(input: {
 
   const generatedMessageId = input.messageId?.trim() || `wamid.portal.text.${Date.now()}`;
   const usuarioIdTrimmed = input.usuarioId?.trim() || '';
+  const hasMessageUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
+  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
 
-  const rows = await query<Message>(
-    `INSERT INTO public.wa_mensajes
-       (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-     VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, 'text', $5, NULL, $6, $7, NOW())
-     ON CONFLICT (message_id) DO UPDATE
-       SET estado = EXCLUDED.estado,
-           texto = EXCLUDED.texto,
-           autor = EXCLUDED.autor,
-           usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
-     RETURNING id::text,
-               COALESCE(message_id, '') AS message_id,
-               phone_number_id,
-               wa_id,
-               usuario_id::text AS usuario_id,
-               direccion,
-               COALESCE(autor, 'humano') AS autor,
-               COALESCE(tipo, 'text') AS tipo,
-               COALESCE(texto, '') AS texto,
-               media_id,
-               COALESCE(estado, 'sent') AS estado,
-               creado_en`,
-    [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, storedText, generatedMessageId, input.status || 'sent']
-  );
+  const rows = hasMessageUsuarioId
+    ? await query<Message>(
+        `INSERT INTO public.wa_mensajes
+           (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+         VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, 'text', $5, NULL, $6, $7, NOW())
+         ON CONFLICT (message_id) DO UPDATE
+           SET estado = EXCLUDED.estado,
+               texto = EXCLUDED.texto,
+               autor = EXCLUDED.autor,
+               usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
+         RETURNING id::text,
+                   COALESCE(message_id, '') AS message_id,
+                   phone_number_id,
+                   wa_id,
+                   usuario_id::text AS usuario_id,
+                   direccion,
+                   COALESCE(autor, 'humano') AS autor,
+                   COALESCE(tipo, 'text') AS tipo,
+                   COALESCE(texto, '') AS texto,
+                   media_id,
+                   COALESCE(estado, 'sent') AS estado,
+                   creado_en`,
+        [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, storedText, generatedMessageId, input.status || 'sent']
+      )
+    : await query<Message>(
+        `INSERT INTO public.wa_mensajes
+           (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+         VALUES ($1, $2, 'out', $3, 'text', $4, NULL, $5, $6, NOW())
+         ON CONFLICT (message_id) DO UPDATE
+           SET estado = EXCLUDED.estado,
+               texto = EXCLUDED.texto,
+               autor = EXCLUDED.autor
+         RETURNING id::text,
+                   COALESCE(message_id, '') AS message_id,
+                   phone_number_id,
+                   wa_id,
+                   NULL::text AS usuario_id,
+                   direccion,
+                   COALESCE(autor, 'humano') AS autor,
+                   COALESCE(tipo, 'text') AS tipo,
+                   COALESCE(texto, '') AS texto,
+                   media_id,
+                   COALESCE(estado, 'sent') AS estado,
+                   creado_en`,
+        [input.phoneNumberId, input.waId, input.actor, storedText, generatedMessageId, input.status || 'sent']
+      );
 
-  await query(
-    `UPDATE public.wa_conversaciones
-        SET ultimo_mensaje = NOW(),
-            ultimo_texto = $3,
-            bot_activo = FALSE,
-            pausado_en = NOW(),
-            pausado_por = $4,
-            actualizado_en = NOW()
-      WHERE (
-        ($5 <> '' AND usuario_id::text = $5)
-        OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
-      )`,
-    [input.phoneNumberId, input.waId, storedText, input.actor, usuarioIdTrimmed]
-  );
+  if (hasConversationUsuarioId) {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET ultimo_mensaje = NOW(),
+              ultimo_texto = $3,
+              bot_activo = FALSE,
+              pausado_en = NOW(),
+              pausado_por = $4,
+              actualizado_en = NOW()
+        WHERE (
+          ($5 <> '' AND usuario_id::text = $5)
+          OR ($5 = '' AND phone_number_id = $1 AND wa_id = $2)
+        )`,
+      [input.phoneNumberId, input.waId, storedText, input.actor, usuarioIdTrimmed]
+    );
+  } else {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET ultimo_mensaje = NOW(),
+              ultimo_texto = $3,
+              bot_activo = FALSE,
+              pausado_en = NOW(),
+              pausado_por = $4,
+              actualizado_en = NOW()
+        WHERE phone_number_id = $1 AND wa_id = $2`,
+      [input.phoneNumberId, input.waId, storedText, input.actor]
+    );
+  }
 
   return rows[0] ?? null;
 }
@@ -512,44 +615,84 @@ export async function addOutgoingMediaMessage(input: {
   }
 
   const usuarioIdTrimmed = input.usuarioId?.trim() || '';
-  const rows = await query<Message>(
-    `INSERT INTO public.wa_mensajes
-       (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
-     VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, $5, $6, $7, $8, 'sent', NOW())
-     ON CONFLICT (message_id) DO UPDATE
-       SET estado = EXCLUDED.estado,
-           media_id = EXCLUDED.media_id,
-           texto = EXCLUDED.texto,
-           autor = EXCLUDED.autor,
-           usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
-     RETURNING id::text,
-               COALESCE(message_id, '') AS message_id,
-               phone_number_id,
-               wa_id,
-               usuario_id::text AS usuario_id,
-               direccion,
-               COALESCE(autor, 'humano') AS autor,
-               COALESCE(tipo, 'text') AS tipo,
-               COALESCE(texto, '') AS texto,
-               media_id,
-               COALESCE(estado, 'sent') AS estado,
-               creado_en`,
-    [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, input.type, storedText, input.mediaId, input.messageId]
-  );
+  const hasMessageUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
+  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const rows = hasMessageUsuarioId
+    ? await query<Message>(
+        `INSERT INTO public.wa_mensajes
+           (phone_number_id, wa_id, usuario_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+         VALUES ($1, $2, NULLIF($3, '')::uuid, 'out', $4, $5, $6, $7, $8, 'sent', NOW())
+         ON CONFLICT (message_id) DO UPDATE
+           SET estado = EXCLUDED.estado,
+               media_id = EXCLUDED.media_id,
+               texto = EXCLUDED.texto,
+               autor = EXCLUDED.autor,
+               usuario_id = COALESCE(EXCLUDED.usuario_id, public.wa_mensajes.usuario_id)
+         RETURNING id::text,
+                   COALESCE(message_id, '') AS message_id,
+                   phone_number_id,
+                   wa_id,
+                   usuario_id::text AS usuario_id,
+                   direccion,
+                   COALESCE(autor, 'humano') AS autor,
+                   COALESCE(tipo, 'text') AS tipo,
+                   COALESCE(texto, '') AS texto,
+                   media_id,
+                   COALESCE(estado, 'sent') AS estado,
+                   creado_en`,
+        [input.phoneNumberId, input.waId, usuarioIdTrimmed, input.actor, input.type, storedText, input.mediaId, input.messageId]
+      )
+    : await query<Message>(
+        `INSERT INTO public.wa_mensajes
+           (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id, estado, creado_en)
+         VALUES ($1, $2, 'out', $3, $4, $5, $6, $7, 'sent', NOW())
+         ON CONFLICT (message_id) DO UPDATE
+           SET estado = EXCLUDED.estado,
+               media_id = EXCLUDED.media_id,
+               texto = EXCLUDED.texto,
+               autor = EXCLUDED.autor
+         RETURNING id::text,
+                   COALESCE(message_id, '') AS message_id,
+                   phone_number_id,
+                   wa_id,
+                   NULL::text AS usuario_id,
+                   direccion,
+                   COALESCE(autor, 'humano') AS autor,
+                   COALESCE(tipo, 'text') AS tipo,
+                   COALESCE(texto, '') AS texto,
+                   media_id,
+                   COALESCE(estado, 'sent') AS estado,
+                   creado_en`,
+        [input.phoneNumberId, input.waId, input.actor, input.type, storedText, input.mediaId, input.messageId]
+      );
 
-  await query(
-    `UPDATE public.wa_conversaciones
-        SET ultimo_mensaje = NOW(),
-            ultimo_texto = COALESCE(NULLIF($3, ''), $4),
-            bot_activo = FALSE,
-            pausado_en = NOW(),
-            pausado_por = $5,
-            actualizado_en = NOW()
-      WHERE (
-        ($6 <> '' AND usuario_id::text = $6)
-        OR ($6 = '' AND phone_number_id = $1 AND wa_id = $2)
-      )`,
-    [input.phoneNumberId, input.waId, storedText, input.type, input.actor, usuarioIdTrimmed]
-  );
+  if (hasConversationUsuarioId) {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET ultimo_mensaje = NOW(),
+              ultimo_texto = COALESCE(NULLIF($3, ''), $4),
+              bot_activo = FALSE,
+              pausado_en = NOW(),
+              pausado_por = $5,
+              actualizado_en = NOW()
+        WHERE (
+          ($6 <> '' AND usuario_id::text = $6)
+          OR ($6 = '' AND phone_number_id = $1 AND wa_id = $2)
+        )`,
+      [input.phoneNumberId, input.waId, storedText, input.type, input.actor, usuarioIdTrimmed]
+    );
+  } else {
+    await query(
+      `UPDATE public.wa_conversaciones
+          SET ultimo_mensaje = NOW(),
+              ultimo_texto = COALESCE(NULLIF($3, ''), $4),
+              bot_activo = FALSE,
+              pausado_en = NOW(),
+              pausado_por = $5,
+              actualizado_en = NOW()
+        WHERE phone_number_id = $1 AND wa_id = $2`,
+      [input.phoneNumberId, input.waId, storedText, input.type, input.actor]
+    );
+  }
   return rows[0] ?? null;
 }
