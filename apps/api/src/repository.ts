@@ -98,6 +98,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const hasBandejaFuente = pool ? await columnExists(pool, 'wa_bandeja', 'fuente') : false;
   const hasBandejaPausadoPor = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_por') : false;
   const hasBandejaPausadoEn = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_en') : false;
+  const hasBandejaArchivada = pool ? await columnExists(pool, 'wa_bandeja', 'archivada') : false;
   const ventanaAbiertaColumn = hasBandejaVentanaAbierta
     ? 'COALESCE(ventana_abierta, FALSE) AS ventana_abierta,'
     : 'FALSE AS ventana_abierta,';
@@ -116,6 +117,9 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const pausadoEnColumn = hasBandejaPausadoEn
     ? 'pausado_en'
     : 'NULL::timestamptz AS pausado_en';
+  const archivadaFilter = hasBandejaArchivada
+    ? 'COALESCE(archivada, FALSE) = FALSE'
+    : 'TRUE';
 
   const conversations: Conversation[] = await query<Conversation>(
     `SELECT phone_number_id,
@@ -133,7 +137,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
             ${pausadoPorColumn}
             ${pausadoEnColumn}
       FROM public.wa_bandeja
-      WHERE COALESCE(archivada, FALSE) = FALSE
+      WHERE ${archivadaFilter}
         AND ($1 = '' OR phone_number_id = $1)
         AND ($2 = '' OR nombre ILIKE '%' || $2 || '%' OR wa_id ILIKE '%' || $2 || '%')
       ORDER BY ultimo_mensaje DESC
