@@ -35,7 +35,7 @@ async function collectStateSessionKeys(
 ) {
   const keys = new Set<string>([waId, `${waId}_lt`, `${waId}_ma`, `${waId}_esp`]);
 
-  if (await relationExists(client, 'public.gc_leads_estado')) {
+  if (await relationExists(client, 'public.gc_leads_estado') && await columnExists(client, 'gc_leads_estado', 'usuario_id')) {
     const result = await client.query(
       `SELECT usuario_id::text AS usuario_id
          FROM public.gc_leads_estado
@@ -56,7 +56,7 @@ async function collectStateSessionKeys(
     }
   }
 
-  if (await relationExists(client, 'public.wa_clientes_estado')) {
+  if (await relationExists(client, 'public.wa_clientes_estado') && await columnExists(client, 'wa_clientes_estado', 'usuario_id')) {
     const result = await client.query(
       `SELECT usuario_id::text AS usuario_id
          FROM public.wa_clientes_estado
@@ -88,8 +88,8 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
-  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
-  const usuarioIdColumn = hasConversationUsuarioId
+  const hasBandejaUsuarioId = pool ? await columnExists(pool, 'wa_bandeja', 'usuario_id') : false;
+  const usuarioIdColumn = hasBandejaUsuarioId
     ? 'usuario_id::text AS usuario_id,'
     : 'NULL::text AS usuario_id,';
 
@@ -120,7 +120,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const waIds = [...new Set(conversations.map((item) => item.wa_id).filter(Boolean))];
   const usuarioIdByWaId = new Map<string, string>();
 
-  if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
+  if (pool && await relationExists(pool, 'public.gc_leads_estado') && await columnExists(pool, 'gc_leads_estado', 'usuario_id')) {
     const rows = await query<{ wa_id: string; usuario_id: string }>(
       `SELECT DISTINCT ON (matched_wa_id)
               matched_wa_id AS wa_id,
@@ -156,7 +156,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
     }
   }
 
-  if (pool && await relationExists(pool, 'public.wa_clientes_estado')) {
+  if (pool && await relationExists(pool, 'public.wa_clientes_estado') && await columnExists(pool, 'wa_clientes_estado', 'usuario_id')) {
     const rows = await query<{ wa_id: string; usuario_id: string }>(
       `SELECT DISTINCT ON (matched_wa_id)
               matched_wa_id AS wa_id,
@@ -191,6 +191,10 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   }));
 
   if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
+    const hasGcUsuarioId = await columnExists(pool, 'gc_leads_estado', 'usuario_id');
+    const gcUsuarioIdColumn = hasGcUsuarioId
+      ? 'usuario_id::text AS usuario_id,'
+      : 'NULL::text AS usuario_id,';
     const missingRows = await query<{
       usuario_id: string | null;
       wa_id: string;
@@ -200,7 +204,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       fuente: string | null;
     }>(
       `SELECT
-          usuario_id::text AS usuario_id,
+          ${gcUsuarioIdColumn}
           COALESCE(NULLIF(chat_id, ''), NULLIF(manychat_id, ''), NULLIF(telefono, '')) AS wa_id,
           COALESCE(NULLIF(nombre_contacto, ''), 'Sin nombre') AS nombre,
           COALESCE(NULLIF(ultimo_mensaje_usuario, ''), NULLIF(ultima_respuesta_bot, ''), 'Nuevo mensaje') AS preview,
@@ -471,22 +475,26 @@ export async function deleteConversation(phoneNumberId: string, waId: string, us
     }
 
     if (await relationExists(client, 'public.gc_leads_estado')) {
+      const hasGcUsuarioId = await columnExists(client, 'gc_leads_estado', 'usuario_id');
+      const usuarioIdFilter = hasGcUsuarioId ? ' OR usuario_id::text = $2' : '';
       await client.query(
         `DELETE FROM public.gc_leads_estado
           WHERE chat_id = $1
              OR manychat_id = $1
              OR telefono = $1
-             OR usuario_id::text = $2`,
+             ${usuarioIdFilter}`,
         [waId, usuarioId?.trim() || '']
       );
     }
 
     if (await relationExists(client, 'public.wa_clientes_estado')) {
+      const hasClientesUsuarioId = await columnExists(client, 'wa_clientes_estado', 'usuario_id');
+      const usuarioIdFilter = hasClientesUsuarioId ? ' OR usuario_id::text = $2' : '';
       await client.query(
         `DELETE FROM public.wa_clientes_estado
           WHERE whatsapp_phone = $1
              OR subscriber_id = $1
-             OR usuario_id::text = $2`,
+             ${usuarioIdFilter}`,
         [waId, usuarioId?.trim() || '']
       );
     }
