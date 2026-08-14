@@ -96,6 +96,8 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const hasBandejaVentanaExpira = pool ? await columnExists(pool, 'wa_bandeja', 'ventana_expira') : false;
   const hasBandejaTipoVentana = pool ? await columnExists(pool, 'wa_bandeja', 'tipo_ventana') : false;
   const hasBandejaFuente = pool ? await columnExists(pool, 'wa_bandeja', 'fuente') : false;
+  const hasBandejaPausadoPor = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_por') : false;
+  const hasBandejaPausadoEn = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_en') : false;
   const ventanaAbiertaColumn = hasBandejaVentanaAbierta
     ? 'COALESCE(ventana_abierta, FALSE) AS ventana_abierta,'
     : 'FALSE AS ventana_abierta,';
@@ -108,6 +110,12 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const fuenteColumn = hasBandejaFuente
     ? "COALESCE(fuente, 'WhatsApp Directo') AS fuente,"
     : "'WhatsApp Directo' AS fuente,";
+  const pausadoPorColumn = hasBandejaPausadoPor
+    ? 'pausado_por,'
+    : 'NULL::text AS pausado_por,';
+  const pausadoEnColumn = hasBandejaPausadoEn
+    ? 'pausado_en'
+    : 'NULL::timestamptz AS pausado_en';
 
   const conversations: Conversation[] = await query<Conversation>(
     `SELECT phone_number_id,
@@ -122,8 +130,8 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
             ${ventanaExpiraColumn}
             ${tipoVentanaColumn}
             ${fuenteColumn}
-            pausado_por,
-            pausado_en
+            ${pausadoPorColumn}
+            ${pausadoEnColumn}
       FROM public.wa_bandeja
       WHERE COALESCE(archivada, FALSE) = FALSE
         AND ($1 = '' OR phone_number_id = $1)
