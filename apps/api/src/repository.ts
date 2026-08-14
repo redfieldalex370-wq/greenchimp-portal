@@ -92,6 +92,22 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   const usuarioIdColumn = hasBandejaUsuarioId
     ? 'usuario_id::text AS usuario_id,'
     : 'NULL::text AS usuario_id,';
+  const hasBandejaVentanaAbierta = pool ? await columnExists(pool, 'wa_bandeja', 'ventana_abierta') : false;
+  const hasBandejaVentanaExpira = pool ? await columnExists(pool, 'wa_bandeja', 'ventana_expira') : false;
+  const hasBandejaTipoVentana = pool ? await columnExists(pool, 'wa_bandeja', 'tipo_ventana') : false;
+  const hasBandejaFuente = pool ? await columnExists(pool, 'wa_bandeja', 'fuente') : false;
+  const ventanaAbiertaColumn = hasBandejaVentanaAbierta
+    ? 'COALESCE(ventana_abierta, FALSE) AS ventana_abierta,'
+    : 'FALSE AS ventana_abierta,';
+  const ventanaExpiraColumn = hasBandejaVentanaExpira
+    ? 'ventana_expira,'
+    : 'NULL::timestamptz AS ventana_expira,';
+  const tipoVentanaColumn = hasBandejaTipoVentana
+    ? "COALESCE(tipo_ventana, 'cerrada') AS tipo_ventana,"
+    : "'cerrada' AS tipo_ventana,";
+  const fuenteColumn = hasBandejaFuente
+    ? "COALESCE(fuente, 'WhatsApp Directo') AS fuente,"
+    : "'WhatsApp Directo' AS fuente,";
 
   const conversations: Conversation[] = await query<Conversation>(
     `SELECT phone_number_id,
@@ -102,10 +118,10 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
             ultimo_mensaje,
             COALESCE(no_leidos, 0)::int AS no_leidos,
             COALESCE(bot_activo, TRUE) AS bot_activo,
-            COALESCE(ventana_abierta, FALSE) AS ventana_abierta,
-            ventana_expira,
-            COALESCE(tipo_ventana, 'cerrada') AS tipo_ventana,
-            COALESCE(fuente, 'WhatsApp Directo') AS fuente,
+            ${ventanaAbiertaColumn}
+            ${ventanaExpiraColumn}
+            ${tipoVentanaColumn}
+            ${fuenteColumn}
             pausado_por,
             pausado_en
       FROM public.wa_bandeja
