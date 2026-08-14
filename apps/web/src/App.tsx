@@ -18,8 +18,6 @@ type TestBotConfig = {
   label: string;
   displayNumber: string;
   phoneNumberId: string;
-  flowUrl: string;
-  sendUrl: string;
 };
 
 const TEST_CHAT_WA_ID = 'portal-test-chat';
@@ -29,14 +27,10 @@ const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
 ];
 
-const TEST_BOT_STORAGE_KEY = 'gc.portal.test-bot-config';
-
 const DEFAULT_TEST_BOT_CONFIG: TestBotConfig = {
   label: 'Pruebas bot',
   displayNumber: 'Flujo temporal',
-  phoneNumberId: '',
-  flowUrl: '',
-  sendUrl: ''
+  phoneNumberId: ''
 };
 
 function conversationKey(conversation: Pick<Conversation, 'phone_number_id' | 'wa_id' | 'usuario_id'>) {
@@ -46,30 +40,10 @@ function conversationKey(conversation: Pick<Conversation, 'phone_number_id' | 'w
     : `${conversation.phone_number_id}:wa:${conversation.wa_id}`;
 }
 
-function readStoredTestBotConfig(): TestBotConfig {
-  if (typeof window === 'undefined') return DEFAULT_TEST_BOT_CONFIG;
-  try {
-    const raw = window.localStorage.getItem(TEST_BOT_STORAGE_KEY);
-    if (!raw) return DEFAULT_TEST_BOT_CONFIG;
-    const parsed = JSON.parse(raw) as Partial<TestBotConfig>;
-    return {
-      label: parsed.label?.trim() || DEFAULT_TEST_BOT_CONFIG.label,
-      displayNumber: parsed.displayNumber?.trim() || DEFAULT_TEST_BOT_CONFIG.displayNumber,
-      phoneNumberId: parsed.phoneNumberId?.trim() || '',
-      flowUrl: parsed.flowUrl?.trim() || '',
-      sendUrl: parsed.sendUrl?.trim() || ''
-    };
-  } catch {
-    return DEFAULT_TEST_BOT_CONFIG;
-  }
-}
-
 export default function App() {
-  const [testBotConfig, setTestBotConfig] = useState<TestBotConfig>(() => readStoredTestBotConfig());
-  const [draftTestBotConfig, setDraftTestBotConfig] = useState<TestBotConfig>(() => readStoredTestBotConfig());
+  const [testBotConfig, setTestBotConfig] = useState<TestBotConfig>(DEFAULT_TEST_BOT_CONFIG);
   const [user, setUser] = useState<PortalUser | null>(null);
   const [activeAccountId, setActiveAccountId] = useState<string>(BASE_PORTAL_ACCOUNTS[0].id);
-  const [showTestConfig, setShowTestConfig] = useState(false);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -231,7 +205,17 @@ export default function App() {
 
   useEffect(() => {
     api.me()
-      .then((response) => setUser(response.user))
+      .then(async (response) => {
+        setUser(response.user);
+        try {
+          const test = await api.testBotConfig();
+          if (test.enabled) {
+            setTestBotConfig({ label: test.label, displayNumber: test.displayNumber, phoneNumberId: test.phoneNumberId });
+          }
+        } catch {
+          // El portal principal sigue funcionando aunque el webhook de pruebas esté deshabilitado.
+        }
+      })
       .catch(() => setUser(null))
       .finally(() => setBooting(false));
   }, []);
@@ -296,20 +280,6 @@ export default function App() {
     knownConversationKeys.current = null;
   }
 
-  function saveTestBotConfig() {
-    const nextConfig: TestBotConfig = {
-      label: draftTestBotConfig.label.trim() || DEFAULT_TEST_BOT_CONFIG.label,
-      displayNumber: draftTestBotConfig.displayNumber.trim() || DEFAULT_TEST_BOT_CONFIG.displayNumber,
-      phoneNumberId: draftTestBotConfig.phoneNumberId.trim(),
-      flowUrl: draftTestBotConfig.flowUrl.trim(),
-      sendUrl: draftTestBotConfig.sendUrl.trim()
-    };
-    setTestBotConfig(nextConfig);
-    window.localStorage.setItem(TEST_BOT_STORAGE_KEY, JSON.stringify(nextConfig));
-    setShowTestConfig(false);
-    showToast('Configuración de pruebas guardada');
-  }
-
   async function send(text: string) {
     if (!selected) return;
     if (isTestMode) {
@@ -332,13 +302,7 @@ export default function App() {
       };
       setTestMessages((items) => [...items, outgoing]);
       try {
-        const result = await api.testBotSend({
-          sendUrl: testBotConfig.sendUrl,
-          flowUrl: testBotConfig.flowUrl,
-          text,
-          actor: user?.name ?? 'humano',
-          phoneNumberId: testAccount.id
-        });
+        const result = await api.testBotSend({ text, actor: user?.name ?? 'humano' });
         const incoming: Message = {
           id: `test-in-${Date.now()}`,
           message_id: `test-in-${Date.now()}`,
@@ -487,7 +451,7 @@ export default function App() {
           ))}
         </nav>
         <div className="topbar-user">
-          <button className="ghost-button" onClick={() => setShowTestConfig(true)}>Configurar prueba</button>
+          {testAccount && <span className="test-mode-label">Webhook de pruebas activo</span>}
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
           <button onClick={() => void logout()}>Salir</button>
         </div>
@@ -522,64 +486,6 @@ export default function App() {
       </main>
 
       {toast && <div className="toast">{toast}</div>}
-      {showTestConfig && (
-        <div className="modal-backdrop" onClick={() => setShowTestConfig(false)}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-card__header">
-              <div>
-                <p className="eyebrow">PRUEBA</p>
-                <h3>Configurar chat de prueba</h3>
-              </div>
-              <button type="button" className="modal-card__close" onClick={() => setShowTestConfig(false)}>×</button>
-            </div>
-            <div className="account-switcher-dropdown__config account-switcher-dropdown__config--modal">
-              <label>
-                <span>Nombre</span>
-                <input
-                  value={draftTestBotConfig.label}
-                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, label: event.target.value }))}
-                  placeholder="Pruebas bot"
-                />
-              </label>
-              <label>
-                <span>Número visible</span>
-                <input
-                  value={draftTestBotConfig.displayNumber}
-                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, displayNumber: event.target.value }))}
-                  placeholder="Flujo temporal"
-                />
-              </label>
-              <label>
-                <span>Phone Number ID</span>
-                <input
-                  value={draftTestBotConfig.phoneNumberId}
-                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, phoneNumberId: event.target.value }))}
-                  placeholder="620..."
-                />
-              </label>
-              <label>
-                <span>URL del flujo</span>
-                <input
-                  value={draftTestBotConfig.flowUrl}
-                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, flowUrl: event.target.value }))}
-                  placeholder="https://n8n.../workflow/..."
-                />
-              </label>
-              <label>
-                <span>URL de envío</span>
-                <input
-                  value={draftTestBotConfig.sendUrl}
-                  onChange={(event) => setDraftTestBotConfig((current) => ({ ...current, sendUrl: event.target.value }))}
-                  placeholder="https://n8n.../webhook/..."
-                />
-              </label>
-              <button type="button" className="account-switcher-dropdown__save" onClick={saveTestBotConfig}>
-                Guardar prueba
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

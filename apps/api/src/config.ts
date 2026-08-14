@@ -34,6 +34,7 @@ const schema = z.object({
   N8N_AUDIO_SEND_URL: z.string().url().optional().or(z.literal('')),
   N8N_BOT_URL: z.string().url().optional().or(z.literal('')),
   N8N_READ_URL: z.string().url().optional().or(z.literal('')),
+  N8N_TEST_SEND_URL: z.string().url().optional().or(z.literal('')),
   N8N_PORTAL_KEY: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_DENTAL_ACCESS_TOKEN: z.string().optional(),
@@ -41,7 +42,10 @@ const schema = z.object({
   WHATSAPP_GRAPH_VERSION: z.string().default('v23.0'),
   DEFAULT_PHONE_NUMBER_ID: z.string().default('1240006745865858'),
   DENTAL_PHONE_NUMBER_ID: z.string().default('620774694457849'),
-  MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default('')
+  MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default(''),
+  TEST_PHONE_NUMBER_ID: z.string().default(''),
+  TEST_BOT_LABEL: z.string().default('Pruebas bot'),
+  TEST_BOT_DISPLAY_NUMBER: z.string().default('Flujo temporal')
 });
 
 export const config = schema.parse(process.env);

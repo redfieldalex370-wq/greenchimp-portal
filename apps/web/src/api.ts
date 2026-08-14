@@ -86,9 +86,16 @@ export const api = {
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media-id`,
       { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption, usuario_id: conversation.usuario_id ?? null }) }
     ),
-  testBotSend: (input: { sendUrl: string; flowUrl?: string; text: string; actor: string; phoneNumberId: string }) =>
+  testBotSend: (input: { text: string; actor: string }) =>
     request<{ ok: true; reply: string; raw?: unknown }>('/test-bot/send', {
       method: 'POST',
       body: JSON.stringify(input)
-    })
+    }),
+  testBotConfig: () => request<{
+    ok: true;
+    enabled: boolean;
+    label: string;
+    displayNumber: string;
+    phoneNumberId: string;
+  }>('/test-bot/config')
 };

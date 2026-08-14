@@ -125,6 +125,16 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, mode: config.DEMO_MODE ? 'demo' : 'production' });
 });
 
+app.get('/api/test-bot/config', requireAuth, (_req, res) => {
+  res.json({
+    ok: true,
+    enabled: Boolean(config.N8N_TEST_SEND_URL && config.TEST_PHONE_NUMBER_ID),
+    label: config.TEST_BOT_LABEL,
+    displayNumber: config.TEST_BOT_DISPLAY_NUMBER,
+    phoneNumberId: config.TEST_PHONE_NUMBER_ID
+  });
+});
+
 app.post('/api/auth/login', async (req, res, next) => {
   try {
     const input = z.object({ username: z.string().trim().min(1), password: z.string().min(1) }).parse(req.body);
@@ -443,25 +453,26 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAut
 app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
   try {
     const input = z.object({
-      sendUrl: z.string().url(),
-      flowUrl: z.string().url().optional().or(z.literal('')),
       text: z.string().trim().min(1).max(4096),
-      actor: z.string().trim().min(1).max(120),
-      phoneNumberId: z.string().trim().min(1).max(120)
+      actor: z.string().trim().min(1).max(120)
     }).parse(req.body);
 
-    const response = await fetch(input.sendUrl, {
+    if (!config.N8N_TEST_SEND_URL || !config.TEST_PHONE_NUMBER_ID) {
+      res.status(503).json({ ok: false, error: 'El webhook de pruebas no está configurado en el servidor.' });
+      return;
+    }
+
+    const response = await fetch(config.N8N_TEST_SEND_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         ...(config.N8N_PORTAL_KEY ? { 'x-portal-key': config.N8N_PORTAL_KEY } : {})
       },
       body: JSON.stringify({
-        phone_number_id: input.phoneNumberId,
+        phone_number_id: config.TEST_PHONE_NUMBER_ID,
         wa_id: 'portal-test-chat',
         texto: input.text,
         usuario: input.actor,
-        flow_url: input.flowUrl || undefined,
         source: 'portal_test'
       }),
       signal: AbortSignal.timeout(20_000)
