@@ -471,6 +471,7 @@ app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
       body: JSON.stringify({
         phone_number_id: config.TEST_PHONE_NUMBER_ID,
         wa_id: 'portal-test-chat',
+        text: input.text,
         texto: input.text,
         usuario: input.actor,
         source: 'portal_test'
