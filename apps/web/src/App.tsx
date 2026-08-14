@@ -21,6 +21,7 @@ type TestBotConfig = {
 };
 
 const TEST_CHAT_PREFIX = 'portal-test-chat';
+const IS_PUBLIC_TEST_ROUTE = window.location.pathname === '/';
 
 function newTestChatId() {
   return `${TEST_CHAT_PREFIX}-${crypto.randomUUID()}`;
@@ -47,7 +48,7 @@ function conversationKey(conversation: Pick<Conversation, 'phone_number_id' | 'w
 export default function App() {
   const [testBotConfig, setTestBotConfig] = useState<TestBotConfig>(DEFAULT_TEST_BOT_CONFIG);
   const [user, setUser] = useState<PortalUser | null>(null);
-  const [activeAccountId, setActiveAccountId] = useState<string>(BASE_PORTAL_ACCOUNTS[0].id);
+  const [activeAccountId, setActiveAccountId] = useState<string>(IS_PUBLIC_TEST_ROUTE ? '' : BASE_PORTAL_ACCOUNTS[0].id);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -76,7 +77,9 @@ export default function App() {
   }, [testBotConfig]);
 
   const portalAccounts = useMemo(
-    () => [...BASE_PORTAL_ACCOUNTS, ...(testAccount ? [testAccount] : [])],
+    () => IS_PUBLIC_TEST_ROUTE
+      ? (testAccount ? [testAccount] : [])
+      : [...BASE_PORTAL_ACCOUNTS, ...(testAccount ? [testAccount] : [])],
     [testAccount]
   );
 
@@ -122,9 +125,9 @@ export default function App() {
 
   useEffect(() => {
     if (!portalAccounts.some((account) => account.id === activeAccountId)) {
-      setActiveAccountId(BASE_PORTAL_ACCOUNTS[0].id);
+      setActiveAccountId(IS_PUBLIC_TEST_ROUTE ? (testAccount?.id ?? '') : BASE_PORTAL_ACCOUNTS[0].id);
     }
-  }, [activeAccountId, portalAccounts]);
+  }, [activeAccountId, portalAccounts, testAccount]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -209,6 +212,18 @@ export default function App() {
   }, [showToast, isTestMode]);
 
   useEffect(() => {
+    if (IS_PUBLIC_TEST_ROUTE) {
+      setUser({ id: 'public-test', username: 'pruebas', name: 'Pruebas bot', email: null });
+      void api.testBotConfig()
+        .then((test) => {
+          if (test.enabled) {
+            setTestBotConfig({ label: test.label, displayNumber: test.displayNumber, phoneNumberId: test.phoneNumberId });
+            setActiveAccountId(test.phoneNumberId);
+          }
+        })
+        .finally(() => setBooting(false));
+      return;
+    }
     api.me()
       .then(async (response) => {
         setUser(response.user);
@@ -410,7 +425,7 @@ export default function App() {
     if (isTestMode) {
       setDeletingConversation(true);
       try {
-        await api.deleteConversation(selected);
+        await api.deleteTestConversation(selected.phone_number_id, selected.wa_id);
         setTestMessages([]);
         setTestChatId(newTestChatId());
         setSelectedKey(null);
@@ -468,7 +483,7 @@ export default function App() {
         <div className="topbar-user">
           {testAccount && <span className="test-mode-label">Webhook de pruebas activo</span>}
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
-          <button onClick={() => void logout()}>Salir</button>
+          {!IS_PUBLIC_TEST_ROUTE && <button onClick={() => void logout()}>Salir</button>}
         </div>
       </header>
 

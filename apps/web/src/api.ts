@@ -97,5 +97,10 @@ export const api = {
     label: string;
     displayNumber: string;
     phoneNumberId: string;
-  }>('/test-bot/config')
+  }>('/test-bot/config'),
+  deleteTestConversation: (phoneNumberId: string, waId: string) =>
+    request<{ ok: true; deleted: boolean }>(
+      `/test-bot/conversation/${encodeURIComponent(phoneNumberId)}/${encodeURIComponent(waId)}`,
+      { method: 'DELETE' }
+    )
 };

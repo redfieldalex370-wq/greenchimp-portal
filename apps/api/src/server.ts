@@ -125,7 +125,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, mode: config.DEMO_MODE ? 'demo' : 'production' });
 });
 
-app.get('/api/test-bot/config', requireAuth, (_req, res) => {
+app.get('/api/test-bot/config', (_req, res) => {
   res.json({
     ok: true,
     enabled: Boolean(config.N8N_TEST_SEND_URL && config.TEST_PHONE_NUMBER_ID),
@@ -133,6 +133,21 @@ app.get('/api/test-bot/config', requireAuth, (_req, res) => {
     displayNumber: config.TEST_BOT_DISPLAY_NUMBER,
     phoneNumberId: config.TEST_PHONE_NUMBER_ID
   });
+});
+
+// La vista pública sólo puede borrar su propia conversación temporal e historial de memoria.
+app.delete('/api/test-bot/conversation/:phoneNumberId/:waId', async (req, res, next) => {
+  try {
+    const params = conversationParamsSchema.parse(req.params);
+    if (params.phoneNumberId !== config.TEST_PHONE_NUMBER_ID || !params.waId.startsWith('portal-test-chat')) {
+      res.status(403).json({ ok: false, error: 'Conversación de pruebas no válida.' });
+      return;
+    }
+    const deleted = await deleteConversation(params.phoneNumberId, params.waId, params.waId);
+    res.json({ ok: true, deleted });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post('/api/auth/login', async (req, res, next) => {
@@ -450,7 +465,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAut
   }
 });
 
-app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
+app.post('/api/test-bot/send', async (req, res, next) => {
   try {
     const input = z.object({
       text: z.string().trim().min(1).max(4096),
