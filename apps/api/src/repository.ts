@@ -441,7 +441,8 @@ export async function deleteConversation(phoneNumberId: string, waId: string, us
       [phoneNumberId, waId]
     );
 
-    if (existing.rowCount === 0) return false;
+    const isPortalTestConversation = waId === 'portal-test-chat';
+    if (existing.rowCount === 0 && !isPortalTestConversation) return false;
 
     const sessionKeys = await collectStateSessionKeys(client, usuarioId?.trim() || waId);
     if (usuarioId?.trim()) {
@@ -473,32 +474,36 @@ export async function deleteConversation(phoneNumberId: string, waId: string, us
     if (await relationExists(client, 'public.n8n_chat_histories')) {
       await client.query(
         `DELETE FROM public.n8n_chat_histories
-          WHERE session_id = ANY($1::text[])`,
-        [sessionKeys]
+          WHERE session_id = ANY($1::text[])
+             OR ($2::text IS NOT NULL AND session_id LIKE $2)`,
+        [sessionKeys, isPortalTestConversation ? `${waId}%` : null]
       );
     }
 
     if (await relationExists(client, 'public.chat_history')) {
       await client.query(
         `DELETE FROM public.chat_history
-          WHERE session_id = ANY($1::text[])`,
-        [sessionKeys]
+          WHERE session_id = ANY($1::text[])
+             OR ($2::text IS NOT NULL AND session_id LIKE $2)`,
+        [sessionKeys, isPortalTestConversation ? `${waId}%` : null]
       );
     }
 
     if (await relationExists(client, 'public.bot_users')) {
       await client.query(
         `DELETE FROM public.bot_users
-          WHERE session_id = ANY($1::text[])`,
-        [sessionKeys]
+          WHERE session_id = ANY($1::text[])
+             OR ($2::text IS NOT NULL AND session_id LIKE $2)`,
+        [sessionKeys, isPortalTestConversation ? `${waId}%` : null]
       );
     }
 
     if (await relationExists(client, 'public.bot_session')) {
       await client.query(
         `DELETE FROM public.bot_session
-          WHERE session_key = ANY($1::text[])`,
-        [sessionKeys]
+          WHERE session_key = ANY($1::text[])
+             OR ($2::text IS NOT NULL AND session_key LIKE $2)`,
+        [sessionKeys, isPortalTestConversation ? `${waId}%` : null]
       );
     }
 
