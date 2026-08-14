@@ -88,10 +88,15 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
+  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const usuarioIdColumn = hasConversationUsuarioId
+    ? 'usuario_id::text AS usuario_id,'
+    : 'NULL::text AS usuario_id,';
+
   const conversations: Conversation[] = await query<Conversation>(
     `SELECT phone_number_id,
             wa_id,
-            NULL::text AS usuario_id,
+            ${usuarioIdColumn}
             COALESCE(nombre, 'Sin nombre') AS nombre,
             COALESCE(ultimo_texto, '') AS ultimo_texto,
             ultimo_mensaje,
@@ -180,7 +185,9 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
   }
   let enriched: Conversation[] = conversations.map((item) => ({
     ...item,
-    usuario_id: usuarioIdByWaId.get(item.wa_id) ?? null
+    // La conversación es la fuente principal cuando ya trae usuario_id.
+    // El cruce con leads sólo completa registros históricos que aún no lo tienen.
+    usuario_id: item.usuario_id?.trim() || usuarioIdByWaId.get(item.wa_id) || null
   }));
 
   if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
