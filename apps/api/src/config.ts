@@ -6,8 +6,8 @@ import { z } from 'zod';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceEnv = path.resolve(currentDir, '../../../.env');
 const bundledEnv = path.resolve(currentDir, '../.env');
-loadEnv({ path: workspaceEnv, override: true });
-loadEnv({ path: bundledEnv, override: true });
+loadEnv({ path: workspaceEnv });
+loadEnv({ path: bundledEnv });
 
 // La configuracion se recarga al reiniciar el proceso del API.
 
