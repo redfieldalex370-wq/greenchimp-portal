@@ -454,7 +454,8 @@ app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
   try {
     const input = z.object({
       text: z.string().trim().min(1).max(4096),
-      actor: z.string().trim().min(1).max(120)
+      actor: z.string().trim().min(1).max(120),
+      chatId: z.string().trim().min(1).max(160).optional()
     }).parse(req.body);
 
     if (!config.N8N_TEST_SEND_URL || !config.TEST_PHONE_NUMBER_ID) {
@@ -470,7 +471,7 @@ app.post('/api/test-bot/send', requireAuth, async (req, res, next) => {
       },
       body: JSON.stringify({
         phone_number_id: config.TEST_PHONE_NUMBER_ID,
-        wa_id: 'portal-test-chat',
+        wa_id: input.chatId || 'portal-test-chat',
         text: input.text,
         texto: input.text,
         usuario: input.actor,

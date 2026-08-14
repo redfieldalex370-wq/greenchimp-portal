@@ -441,7 +441,7 @@ export async function deleteConversation(phoneNumberId: string, waId: string, us
       [phoneNumberId, waId]
     );
 
-    const isPortalTestConversation = waId === 'portal-test-chat';
+    const isPortalTestConversation = waId === 'portal-test-chat' || waId.startsWith('portal-test-chat-');
     if (existing.rowCount === 0 && !isPortalTestConversation) return false;
 
     const sessionKeys = await collectStateSessionKeys(client, usuarioId?.trim() || waId);

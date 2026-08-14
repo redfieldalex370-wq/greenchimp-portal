@@ -86,7 +86,7 @@ export const api = {
       `/conversations/${encodeURIComponent(conversation.phone_number_id)}/${encodeURIComponent(conversation.wa_id)}/messages/media-id`,
       { method: 'POST', body: JSON.stringify({ type, media_id: mediaId, caption, usuario_id: conversation.usuario_id ?? null }) }
     ),
-  testBotSend: (input: { text: string; actor: string }) =>
+  testBotSend: (input: { text: string; actor: string; chatId: string }) =>
     request<{ ok: true; reply: string; raw?: unknown }>('/test-bot/send', {
       method: 'POST',
       body: JSON.stringify(input)

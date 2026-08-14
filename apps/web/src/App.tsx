@@ -20,7 +20,11 @@ type TestBotConfig = {
   phoneNumberId: string;
 };
 
-const TEST_CHAT_WA_ID = 'portal-test-chat';
+const TEST_CHAT_PREFIX = 'portal-test-chat';
+
+function newTestChatId() {
+  return `${TEST_CHAT_PREFIX}-${crypto.randomUUID()}`;
+}
 
 const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
@@ -49,6 +53,7 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [testMessages, setTestMessages] = useState<Message[]>([]);
+  const [testChatId, setTestChatId] = useState(() => newTestChatId());
   const [search, setSearch] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -82,8 +87,8 @@ export default function App() {
     const lastMessage = testMessages[testMessages.length - 1];
     return {
       phone_number_id: testAccount.id,
-      wa_id: TEST_CHAT_WA_ID,
-      usuario_id: TEST_CHAT_WA_ID,
+      wa_id: testChatId,
+      usuario_id: testChatId,
       nombre: testAccount.name || 'Pruebas bot',
       ultimo_texto: lastMessage?.texto || 'Escribe para probar el flujo',
       ultimo_mensaje: lastMessage?.creado_en || new Date().toISOString(),
@@ -96,7 +101,7 @@ export default function App() {
       pausado_por: null,
       pausado_en: null
     };
-  }, [testAccount, testMessages]);
+  }, [testAccount, testMessages, testChatId]);
 
   const displayedConversations = useMemo(() => {
     if (!isTestMode) return conversations;
@@ -290,8 +295,8 @@ export default function App() {
         id: `test-out-${Date.now()}`,
         message_id: `test-out-${Date.now()}`,
         phone_number_id: testAccount.id,
-        wa_id: TEST_CHAT_WA_ID,
-        usuario_id: TEST_CHAT_WA_ID,
+        wa_id: testChatId,
+        usuario_id: testChatId,
         direccion: 'out',
         autor: user?.name ?? 'humano',
         tipo: 'text',
@@ -302,13 +307,13 @@ export default function App() {
       };
       setTestMessages((items) => [...items, outgoing]);
       try {
-        const result = await api.testBotSend({ text, actor: user?.name ?? 'humano' });
+        const result = await api.testBotSend({ text, actor: user?.name ?? 'humano', chatId: testChatId });
         const incoming: Message = {
           id: `test-in-${Date.now()}`,
           message_id: `test-in-${Date.now()}`,
           phone_number_id: testAccount.id,
-          wa_id: TEST_CHAT_WA_ID,
-          usuario_id: TEST_CHAT_WA_ID,
+          wa_id: testChatId,
+          usuario_id: testChatId,
           direccion: 'in',
           autor: testAccount.name || 'Pruebas bot',
           tipo: 'text',
@@ -403,8 +408,18 @@ export default function App() {
   async function removeConversation() {
     if (!selected) return;
     if (isTestMode) {
-      setTestMessages([]);
-      showToast('Historial de prueba limpiado');
+      setDeletingConversation(true);
+      try {
+        await api.deleteConversation(selected);
+        setTestMessages([]);
+        setTestChatId(newTestChatId());
+        setSelectedKey(null);
+        showToast('Historial de prueba eliminado; se creó una sesión nueva');
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'No se pudo eliminar la prueba.');
+      } finally {
+        setDeletingConversation(false);
+      }
       return;
     }
     const confirmed = window.confirm(
