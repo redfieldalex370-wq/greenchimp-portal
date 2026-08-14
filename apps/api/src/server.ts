@@ -532,6 +532,7 @@ const webDist = fs.existsSync(bundledWebDist) ? bundledWebDist : workspaceWebDis
 if (config.NODE_ENV === 'production' && fs.existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get('/', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+  app.get('/b/DSfRvuk-y5-A8', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
 }
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
