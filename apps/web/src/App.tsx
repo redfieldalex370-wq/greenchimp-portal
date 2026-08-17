@@ -64,6 +64,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   const knownConversationKeys = useRef<Set<string> | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
+  const conversationRequestRef = useRef(0);
+  const messageRequestRef = useRef(0);
 
   const testAccount = useMemo<PortalAccount | null>(() => {
     if (!testBotConfig.phoneNumberId.trim()) return null;
@@ -156,9 +158,12 @@ export default function App() {
       if (testConversation) setSelectedKey(conversationKey(testConversation));
       return;
     }
+    const requestId = ++conversationRequestRef.current;
+    const accountIdAtRequest = activeAccountId;
     setLoadingConversations(true);
     try {
       const response = await api.conversations(term, activeAccountId);
+      if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountId) return;
       if (!term.trim()) {
         const nextKeys = new Set(response.conversations.map((item) => conversationKey(item)));
         const known = knownConversationKeys.current;
@@ -200,9 +205,12 @@ export default function App() {
 
   const refreshMessages = useCallback(async (conversation: Conversation) => {
     if (isTestMode) return;
+    const requestId = ++messageRequestRef.current;
+    const accountIdAtRequest = activeAccountId;
     setLoadingMessages(true);
     try {
       const response = await api.messages(conversation);
+      if (requestId !== messageRequestRef.current || accountIdAtRequest !== activeAccountId) return;
       setMessages(response.messages);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'No se pudo cargar el historial.');
@@ -296,7 +304,10 @@ export default function App() {
     setActiveAccountId(phoneNumberId);
     setSearch('');
     setSelectedKey(null);
+    setConversations([]);
     setMessages([]);
+    conversationRequestRef.current += 1;
+    messageRequestRef.current += 1;
     knownConversationKeys.current = null;
   }
 
