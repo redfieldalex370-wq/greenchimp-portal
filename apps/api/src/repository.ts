@@ -145,10 +145,13 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
     [phoneNumberId.trim(), search.trim()]
   );
   const term = search.trim().toLowerCase();
+  const selectedPhoneNumberId = phoneNumberId.trim();
   const waIds = [...new Set(conversations.map((item) => item.wa_id).filter(Boolean))];
   const usuarioIdByWaId = new Map<string, string>();
+  const canUseGreenChimpState = !selectedPhoneNumberId || selectedPhoneNumberId === config.DEFAULT_PHONE_NUMBER_ID;
+  const canUseDentalState = !selectedPhoneNumberId || selectedPhoneNumberId === config.DENTAL_PHONE_NUMBER_ID;
 
-  if (pool && await relationExists(pool, 'public.gc_leads_estado') && await columnExists(pool, 'gc_leads_estado', 'usuario_id')) {
+  if (canUseGreenChimpState && pool && await relationExists(pool, 'public.gc_leads_estado') && await columnExists(pool, 'gc_leads_estado', 'usuario_id')) {
     const rows = await query<{ wa_id: string; usuario_id: string }>(
       `SELECT DISTINCT ON (matched_wa_id)
               matched_wa_id AS wa_id,
@@ -184,7 +187,7 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
     }
   }
 
-  if (pool && await relationExists(pool, 'public.wa_clientes_estado') && await columnExists(pool, 'wa_clientes_estado', 'usuario_id')) {
+  if (canUseDentalState && pool && await relationExists(pool, 'public.wa_clientes_estado') && await columnExists(pool, 'wa_clientes_estado', 'usuario_id')) {
     const rows = await query<{ wa_id: string; usuario_id: string }>(
       `SELECT DISTINCT ON (matched_wa_id)
               matched_wa_id AS wa_id,
@@ -218,7 +221,6 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
     usuario_id: item.usuario_id?.trim() || usuarioIdByWaId.get(item.wa_id) || null
   }));
 
-  const selectedPhoneNumberId = phoneNumberId.trim();
   const canBackfillGreenChimpLeads = !selectedPhoneNumberId || selectedPhoneNumberId === config.DEFAULT_PHONE_NUMBER_ID;
 
   if (canBackfillGreenChimpLeads && pool && await relationExists(pool, 'public.gc_leads_estado')) {
@@ -328,7 +330,10 @@ export async function listMessages(phoneNumberId: string, waId: string, usuarioI
           (
             $3 <> ''
             AND (
-              usuario_id::text = $3
+              (
+                phone_number_id = $1
+                AND usuario_id::text = $3
+              )
               OR (
                 usuario_id IS NULL
                 AND phone_number_id = $1
@@ -416,7 +421,10 @@ export async function markRead(phoneNumberId: string, waId: string, usuarioId?: 
         (
           $3 <> ''
           AND (
-            usuario_id::text = $3
+            (
+              phone_number_id = $1
+              AND usuario_id::text = $3
+            )
             OR (
               usuario_id IS NULL
               AND phone_number_id = $1
@@ -587,7 +595,10 @@ export async function setBotActive(
         (
           $5 <> ''
           AND (
-            usuario_id::text = $5
+            (
+              phone_number_id = $1
+              AND usuario_id::text = $5
+            )
             OR (
               usuario_id IS NULL
               AND phone_number_id = $1
@@ -712,7 +723,10 @@ export async function addOutgoingTextMessage(input: {
           (
             $5 <> ''
             AND (
-              usuario_id::text = $5
+              (
+                phone_number_id = $1
+                AND usuario_id::text = $5
+              )
               OR (
                 usuario_id IS NULL
                 AND phone_number_id = $1
@@ -844,7 +858,10 @@ export async function addOutgoingMediaMessage(input: {
           (
             $6 <> ''
             AND (
-              usuario_id::text = $6
+              (
+                phone_number_id = $1
+                AND usuario_id::text = $6
+              )
               OR (
                 usuario_id IS NULL
                 AND phone_number_id = $1
