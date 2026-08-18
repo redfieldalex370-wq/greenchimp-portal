@@ -218,7 +218,10 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
     usuario_id: item.usuario_id?.trim() || usuarioIdByWaId.get(item.wa_id) || null
   }));
 
-  if (pool && await relationExists(pool, 'public.gc_leads_estado')) {
+  const selectedPhoneNumberId = phoneNumberId.trim();
+  const canBackfillGreenChimpLeads = !selectedPhoneNumberId || selectedPhoneNumberId === config.DEFAULT_PHONE_NUMBER_ID;
+
+  if (canBackfillGreenChimpLeads && pool && await relationExists(pool, 'public.gc_leads_estado')) {
     const hasGcUsuarioId = await columnExists(pool, 'gc_leads_estado', 'usuario_id');
     const gcUsuarioIdColumn = hasGcUsuarioId
       ? 'usuario_id::text AS usuario_id,'
@@ -250,13 +253,13 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
 
     const knownKeys = new Set(enriched.map((item) => conversationKeyFromValues(item.phone_number_id, item.wa_id, item.usuario_id)));
 
-    const inferredPhoneNumberId = phoneNumberId.trim();
+    const inferredPhoneNumberId = selectedPhoneNumberId;
     const missingConversations = missingRows
       .map((row) => {
         const waId = (row.wa_id || '').trim();
         const usuarioId = (row.usuario_id || '').trim() || null;
         if (!waId) return null;
-        const inferredPhone = inferredPhoneNumberId || inferPhoneNumberIdFromWaId(waId);
+        const inferredPhone = inferredPhoneNumberId || config.DEFAULT_PHONE_NUMBER_ID || inferPhoneNumberIdFromWaId(waId);
         if (!inferredPhone) return null;
         const key = conversationKeyFromValues(inferredPhone, waId, usuarioId);
         if (knownKeys.has(key)) return null;
