@@ -164,10 +164,10 @@ export default function App() {
       return;
     }
     const requestId = ++conversationRequestRef.current;
-    const accountIdAtRequest = activeAccountId;
+    const accountIdAtRequest = activeAccountRef.current;
     setLoadingConversations(true);
     try {
-      const response = await api.conversations(term, activeAccountId);
+      const response = await api.conversations(term, accountIdAtRequest);
       if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       if (!term.trim()) {
         const nextKeys = new Set(response.conversations.map((item) => conversationKey(item)));
@@ -187,10 +187,13 @@ export default function App() {
         return first ? conversationKey(first) : null;
       });
     } catch (error) {
+      if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       if ((error as Error & { status?: number }).status === 401) setUser(null);
       else showToast(error instanceof Error ? error.message : 'No se pudo cargar la bandeja.');
     } finally {
-      setLoadingConversations(false);
+      if (requestId === conversationRequestRef.current && accountIdAtRequest === activeAccountRef.current) {
+        setLoadingConversations(false);
+      }
     }
   }, [search, activeAccountId, showToast, playNewConversationSound, isTestMode, testConversation]);
 
@@ -211,16 +214,19 @@ export default function App() {
   const refreshMessages = useCallback(async (conversation: Conversation) => {
     if (isTestMode) return;
     const requestId = ++messageRequestRef.current;
-    const accountIdAtRequest = activeAccountId;
+    const accountIdAtRequest = conversation.phone_number_id;
     setLoadingMessages(true);
     try {
       const response = await api.messages(conversation);
       if (requestId !== messageRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       setMessages(response.messages);
     } catch (error) {
+      if (requestId !== messageRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       showToast(error instanceof Error ? error.message : 'No se pudo cargar el historial.');
     } finally {
-      setLoadingMessages(false);
+      if (requestId === messageRequestRef.current && accountIdAtRequest === activeAccountRef.current) {
+        setLoadingMessages(false);
+      }
     }
   }, [showToast, isTestMode]);
 

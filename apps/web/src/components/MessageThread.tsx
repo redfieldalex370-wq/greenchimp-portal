@@ -399,6 +399,7 @@ export function MessageThread({
           );
         })}
 
+        {loading && safeMessages.length === 0 && <div className="empty-thread">Cargando historial...</div>}
         {!loading && safeMessages.length === 0 && <div className="empty-thread">Todavia no hay mensajes guardados.</div>}
         <div ref={bottomRef} />
       </div>
