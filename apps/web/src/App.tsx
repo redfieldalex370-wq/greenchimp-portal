@@ -64,6 +64,7 @@ export default function App() {
   const [toast, setToast] = useState('');
   const knownConversationKeys = useRef<Set<string> | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
+  const activeAccountRef = useRef(activeAccountId);
   const conversationRequestRef = useRef(0);
   const messageRequestRef = useRef(0);
 
@@ -86,6 +87,10 @@ export default function App() {
   );
 
   const isTestMode = Boolean(testAccount && activeAccountId === testAccount.id);
+
+  useEffect(() => {
+    activeAccountRef.current = activeAccountId;
+  }, [activeAccountId]);
 
   const testConversation = useMemo<Conversation | null>(() => {
     if (!testAccount) return null;
@@ -163,7 +168,7 @@ export default function App() {
     setLoadingConversations(true);
     try {
       const response = await api.conversations(term, activeAccountId);
-      if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountId) return;
+      if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       if (!term.trim()) {
         const nextKeys = new Set(response.conversations.map((item) => conversationKey(item)));
         const known = knownConversationKeys.current;
@@ -210,7 +215,7 @@ export default function App() {
     setLoadingMessages(true);
     try {
       const response = await api.messages(conversation);
-      if (requestId !== messageRequestRef.current || accountIdAtRequest !== activeAccountId) return;
+      if (requestId !== messageRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
       setMessages(response.messages);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'No se pudo cargar el historial.');
@@ -301,6 +306,7 @@ export default function App() {
 
   function selectAccount(phoneNumberId: string) {
     if (phoneNumberId === activeAccountId) return;
+    activeAccountRef.current = phoneNumberId;
     setActiveAccountId(phoneNumberId);
     setSearch('');
     setSelectedKey(null);
