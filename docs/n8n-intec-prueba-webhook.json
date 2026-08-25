@@ -1156,10 +1156,8 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ ok: true, reply: $json.reply || $json.final_text || $json.text || '', final_text: $json.final_text || $json.reply || $json.text || '', chat_id: $json.chat_id || '', session_key: $json.session_key || '' }) }}",
-        "options": {
-          "responseCode": 200
-        }
+        "responseBody": "={{ { ok: true, reply: $json.reply || $json.final_text || $json.output || $json.text || $json.texto || '', final_text: $json.final_text || $json.reply || $json.output || $json.text || $json.texto || '', text: $json.text || $json.reply || $json.final_text || $json.output || '', chat_id: $json.chat_id || '', session_key: $json.session_key || '' } }}",
+        "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -1169,6 +1167,48 @@
       ],
       "id": "9d1b1de1-8596-41f3-8db1-399862f9bf16",
       "name": "Responder prueba INTEC"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "modo-prueba",
+              "leftValue": "={{ $json.modo || '' }}",
+              "rightValue": "prueba",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "fuente-prueba",
+              "leftValue": "={{ $json.fuente || '' }}",
+              "rightValue": "Portal prueba",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1540,
+        -780
+      ],
+      "id": "32790a1a-c54e-4dc4-93f0-2fb351ccc24f",
+      "name": "IF Entrada Prueba"
     }
   ],
   "connections": {
@@ -1234,7 +1274,7 @@
       "main": [
         [
           {
-            "node": "IF Evento Valido",
+            "node": "IF Entrada Prueba",
             "type": "main",
             "index": 0
           }
@@ -1651,6 +1691,24 @@
           {
             "node": "Agente INTEC",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Entrada Prueba": {
+      "main": [
+        [
+          {
+            "node": "IF Es Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF Evento Valido",
+            "type": "main",
             "index": 0
           }
         ]
