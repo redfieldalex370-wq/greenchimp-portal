@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// INTEC - Entrada para prueba desde portal y compatibilidad WhatsApp Cloud API\nconst ZONA = 'America/Mexico_City';\nconst APERTURA = 9;\nconst CIERRE = 18;\n\nconst input = $input.first()?.json || {};\nconst body = input.body || input;\n\nfunction txt(v) {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  const b = s.toLowerCase();\n  if (!s || b === 'null' || b === 'undefined' || s === '[null]') return '';\n  return s;\n}\n\nconst ahora = DateTime.now().setZone(ZONA);\nconst hora = ahora.hour + ahora.minute / 60;\nconst dentro_de_horario = hora >= APERTURA && hora < CIERRE;\n\nconst portalText = txt(body.text) || txt(body.message) || txt(body.input) || txt(body.texto) || txt(body.mensaje);\nif (portalText) {\n  const chatId = txt(body.chat_id) || txt(body.wa_id) || txt(body.session_key) || 'portal-test-chat';\n  const nombre = txt(body.nombre) || txt(body.name) || txt(body.usuario) || txt(body.actor) || 'Pruebas bot';\n  return [{ json: {\n    ok: true,\n    tipo_evento: 'mensaje',\n    chat_id: chatId,\n    session_key: txt(body.session_key) || chatId + '_intec',\n    phone_number_id: txt(body.phone_number_id) || 'intec-prueba',\n    message_id: txt(body.message_id) || 'portal-' + Date.now(),\n    nombre,\n    tipo_mensaje: 'text',\n    text: portalText,\n    media_id: '',\n    es_media: false,\n    es_rancio: false,\n    fuente: 'Portal prueba',\n    bot_puede_responder: true,\n    dentro_de_horario,\n    hora_local: ahora.toFormat('HH:mm'),\n    dia_semana: ahora.setLocale('es').toFormat('cccc'),\n  }}];\n}\n\nconst value = body?.entry?.[0]?.changes?.[0]?.value || {};\nconst metadata = value?.metadata || {};\nconst contact = value?.contacts?.[0] || {};\nconst message = value?.messages?.[0] || null;\nconst echo = value?.message_echoes?.[0] || null;\n\nif (!message && !echo) {\n  return [{ json: { ok: false, tipo_evento: 'descartar', error: 'Evento sin mensaje.' } }];\n}\n\nconst phone_number_id = txt(metadata.phone_number_id);\n\nif (echo) {\n  const autor_bot = txt(echo.from) === phone_number_id;\n  const texto_echo = txt(echo.text?.body) || txt(echo[echo.type]?.caption) || '[archivo]';\n  const wa_id_echo = txt(echo.to) || txt(echo.recipient_id);\n  if (!wa_id_echo) return [{ json: { ok:false, tipo_evento:'descartar', error:'Echo sin destinatario.' } }];\n  return [{ json: {\n    ok: true,\n    tipo_evento: 'echo',\n    chat_id: wa_id_echo,\n    session_key: wa_id_echo + '_intec',\n    phone_number_id,\n    message_id: txt(echo.id),\n    text: texto_echo,\n    autor_bot,\n    dentro_de_horario,\n    hora_local: ahora.toFormat('HH:mm'),\n    dia_semana: ahora.setLocale('es').toFormat('cccc'),\n  }}];\n}\n\nconst wa_id = txt(contact.wa_id) || txt(message.from);\nconst tipo = txt(message.type);\nif (!wa_id) return [{ json: { ok:false, tipo_evento:'descartar', error:'Webhook sin wa_id.' } }];\n\nlet text = '';\nlet media_id = '';\nif (tipo === 'text') text = txt(message.text?.body);\nelse if (tipo === 'button') text = txt(message.button?.text);\nelse if (tipo === 'interactive') text = txt(message.interactive?.button_reply?.title) || txt(message.interactive?.list_reply?.title);\nelse if (['audio','image','video','document','sticker'].includes(tipo)) {\n  media_id = txt(message[tipo]?.id);\n  text = txt(message[tipo]?.caption);\n}\n\nconst es_media = ['audio','image','video','document','sticker'].includes(tipo);\nconst hMensaje = DateTime.fromSeconds(Number(message.timestamp || 0)).setZone(ZONA);\nconst antiguedad_min = ahora.diff(hMensaje, 'minutes').minutes;\nconst es_rancio = Number.isFinite(antiguedad_min) && antiguedad_min > 15;\nconst referral = message.referral || {};\nconst fuente = referral.source_type ? 'Meta Ads' : 'WhatsApp Directo';\n\nreturn [{ json: {\n  ok: true,\n  tipo_evento: 'mensaje',\n  chat_id: wa_id,\n  session_key: wa_id + '_intec',\n  phone_number_id,\n  message_id: txt(message.id),\n  nombre: txt(contact.profile?.name),\n  tipo_mensaje: tipo,\n  text,\n  media_id,\n  es_media,\n  es_rancio,\n  fuente,\n  bot_puede_responder: true,\n  dentro_de_horario,\n  hora_local: ahora.toFormat('HH:mm'),\n  dia_semana: ahora.setLocale('es').toFormat('cccc'),\n}}];"
+        "jsCode": "// INTEC - Entrada para prueba desde portal y compatibilidad WhatsApp Cloud API\nconst ZONA = 'America/Mexico_City';\nconst APERTURA = 9;\nconst CIERRE = 18;\n\nconst input = $input.first()?.json || {};\nconst body = input.body || input;\n\nfunction txt(v) {\n  if (v === null || v === undefined) return '';\n  const s = String(v).trim();\n  const b = s.toLowerCase();\n  if (!s || b === 'null' || b === 'undefined' || s === '[null]') return '';\n  return s;\n}\n\nconst ahora = DateTime.now().setZone(ZONA);\nconst hora = ahora.hour + ahora.minute / 60;\nconst dentro_de_horario = hora >= APERTURA && hora < CIERRE;\n\n// Entrada desde el portal de pruebas\nconst portalText = txt(body.text) || txt(body.message) || txt(body.input) || txt(body.texto) || txt(body.mensaje);\nif (portalText) {\n  const chatId = txt(body.chat_id) || txt(body.wa_id) || txt(body.session_key) || 'portal-test-chat';\n  const nombre = txt(body.nombre) || txt(body.name) || txt(body.usuario) || txt(body.actor) || 'Pruebas bot';\n  return [{ json: {\n    ok: true,\n    modo: 'prueba',\n    tipo_evento: 'mensaje',\n    chat_id: chatId,\n    session_key: txt(body.session_key) || chatId + '_intec',\n    phone_number_id: txt(body.phone_number_id) || 'intec-prueba',\n    message_id: txt(body.message_id) || 'portal-' + Date.now(),\n    nombre,\n    tipo_mensaje: 'text',\n    text: portalText,\n    media_id: '',\n    es_media: false,\n    es_rancio: false,\n    fuente: 'Portal prueba',\n    bot_puede_responder: true,\n    dentro_de_horario,\n    hora_local: ahora.toFormat('HH:mm'),\n    dia_semana: ahora.setLocale('es').toFormat('cccc'),\n  }}];\n}\n\n// Entrada real de WhatsApp Cloud API\nconst value = body?.entry?.[0]?.changes?.[0]?.value || {};\nconst metadata = value?.metadata || {};\nconst contact = value?.contacts?.[0] || {};\nconst message = value?.messages?.[0] || null;\nconst echo = value?.message_echoes?.[0] || null;\n\nif (!message && !echo) {\n  return [{ json: { ok: false, tipo_evento: 'descartar', error: 'Evento sin mensaje.' } }];\n}\n\nconst phone_number_id = txt(metadata.phone_number_id);\n\nif (echo) {\n  const autor_bot = txt(echo.from) === phone_number_id;\n  const texto_echo = txt(echo.text?.body) || txt(echo[echo.type]?.caption) || '[archivo]';\n  const wa_id_echo = txt(echo.to) || txt(echo.recipient_id);\n  if (!wa_id_echo) return [{ json: { ok:false, tipo_evento:'descartar', error:'Echo sin destinatario.' } }];\n  return [{ json: {\n    ok: true,\n    modo: 'whatsapp',\n    tipo_evento: 'echo',\n    chat_id: wa_id_echo,\n    session_key: wa_id_echo + '_intec',\n    phone_number_id,\n    message_id: txt(echo.id),\n    text: texto_echo,\n    autor_bot,\n    dentro_de_horario,\n    hora_local: ahora.toFormat('HH:mm'),\n    dia_semana: ahora.setLocale('es').toFormat('cccc'),\n  }}];\n}\n\nconst wa_id = txt(contact.wa_id) || txt(message.from);\nconst tipo = txt(message.type);\nif (!wa_id) return [{ json: { ok:false, tipo_evento:'descartar', error:'Webhook sin wa_id.' } }];\n\nlet text = '';\nlet media_id = '';\nif (tipo === 'text') text = txt(message.text?.body);\nelse if (tipo === 'button') text = txt(message.button?.text);\nelse if (tipo === 'interactive') text = txt(message.interactive?.button_reply?.title) || txt(message.interactive?.list_reply?.title);\nelse if (['audio','image','video','document','sticker'].includes(tipo)) {\n  media_id = txt(message[tipo]?.id);\n  text = txt(message[tipo]?.caption);\n}\n\nconst es_media = ['audio','image','video','document','sticker'].includes(tipo);\nconst hMensaje = DateTime.fromSeconds(Number(message.timestamp || 0)).setZone(ZONA);\nconst antiguedad_min = ahora.diff(hMensaje, 'minutes').minutes;\nconst es_rancio = Number.isFinite(antiguedad_min) && antiguedad_min > 15;\nconst referral = message.referral || {};\nconst fuente = referral.source_type ? 'Meta Ads' : 'WhatsApp Directo';\n\nreturn [{ json: {\n  ok: true,\n  modo: 'whatsapp',\n  tipo_evento: 'mensaje',\n  chat_id: wa_id,\n  session_key: wa_id + '_intec',\n  phone_number_id,\n  message_id: txt(message.id),\n  nombre: txt(contact.profile?.name),\n  tipo_mensaje: tipo,\n  text,\n  media_id,\n  es_media,\n  es_rancio,\n  fuente,\n  dentro_de_horario,\n  hora_local: ahora.toFormat('HH:mm'),\n  dia_semana: ahora.setLocale('es').toFormat('cccc'),\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -445,7 +445,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const base = $('Extraer Datos').first().json || {};\nconst texto = 'Recibí tu archivo, pero en este modo de prueba solo puedo responder mensajes de texto. Escríbeme tu duda y te contesto aquí mismo.';\nreturn [{ json: {\n  ok: true,\n  chat_id: base.chat_id,\n  phone_number_id: base.phone_number_id,\n  session_key: base.session_key,\n  reply: texto,\n  final_text: texto,\n  text: texto,\n  escalar: false,\n  motivo_escalamiento: '',\n}}];"
+        "jsCode": "const base = $('Extraer Datos').first().json || {};\nconst texto = base.modo === 'prueba'\n  ? 'Recibí tu archivo, pero en este modo de prueba solo puedo responder mensajes de texto. Escríbeme tu duda y te contesto aquí mismo.'\n  : (base.dentro_de_horario\n      ? 'Gracias por el archivo. Permíteme verificarlo con un asesor y en un momento te respondemos.'\n      : 'Gracias por el archivo. Mañana a primera hora un asesor lo revisa y te responde.');\nreturn [{ json: {\n  ok: true,\n  modo: base.modo || 'whatsapp',\n  fuente: base.fuente || '',\n  chat_id: base.chat_id,\n  phone_number_id: base.phone_number_id,\n  session_key: base.session_key,\n  reply: texto,\n  final_text: texto,\n  text: texto,\n  escalar: base.modo !== 'prueba',\n  motivo_escalamiento: base.modo === 'prueba' ? '' : 'El cliente envio un archivo (' + base.tipo_mensaje + ')',\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -523,7 +523,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Limpia la salida del agente y devuelve respuesta compatible con portal.\nconst base = $('Extraer Datos').first().json || {};\nconst raw = $input.first().json || {};\n\nlet texto = String(raw.output ?? raw.text ?? raw.reply ?? raw.final_text ?? '').trim();\nconst MARCA = '[[ESCALAR]]';\nconst escalar = texto.includes(MARCA);\ntexto = texto.split(MARCA).join('').trim();\n\nconst REGEX_PRECIO = /(\\$\\s?\\d|(\\d{3,5})\\s?(pesos|mxn))/i;\nlet motivo = escalar ? 'El agente marco escalamiento' : '';\nif (REGEX_PRECIO.test(texto)) {\n  texto = base.dentro_de_horario\n    ? 'Permíteme confirmar disponibilidad y en un momento un asesor te comparte el costo exacto.'\n    : 'Mañana a primera hora un asesor te confirma disponibilidad y el costo exacto.';\n  motivo = 'BLOQUEO: el agente intento dar un precio';\n}\n\nif (!texto) texto = 'Permíteme un momento, enseguida te atiendo.';\nif (texto.length > 4096) texto = texto.slice(0, 4093) + '...';\n\nreturn [{ json: {\n  ok: true,\n  chat_id: base.chat_id,\n  phone_number_id: base.phone_number_id,\n  session_key: base.session_key,\n  reply: texto,\n  final_text: texto,\n  text: texto,\n  escalar: escalar || motivo.startsWith('BLOQUEO'),\n  motivo_escalamiento: motivo,\n}}];"
+        "jsCode": "// Limpia la salida del agente y detecta la marca de escalamiento.\nconst base = $('Extraer Datos').first().json || {};\nconst raw = $input.first().json || {};\n\nlet texto = String(raw.output ?? raw.text ?? raw.reply ?? raw.final_text ?? '').trim();\n\nconst MARCA = '[[ESCALAR]]';\nconst escalar = texto.includes(MARCA);\ntexto = texto.split(MARCA).join('').trim();\n\nconst REGEX_PRECIO = /(\\$\\s?\\d|(\\d{3,5})\\s?(pesos|mxn))/i;\nlet motivo = escalar ? 'El agente marco escalamiento' : '';\nif (REGEX_PRECIO.test(texto)) {\n  texto = base.dentro_de_horario\n    ? 'Permíteme confirmar disponibilidad y en un momento un asesor te comparte el costo exacto.'\n    : 'Mañana a primera hora un asesor te confirma disponibilidad y el costo exacto.';\n  motivo = 'BLOQUEO: el agente intento dar un precio';\n}\n\nif (!texto) texto = 'Permíteme un momento, enseguida te atiendo.';\nif (texto.length > 4096) texto = texto.slice(0, 4093) + '...';\n\nreturn [{ json: {\n  ok: true,\n  modo: base.modo || 'whatsapp',\n  fuente: base.fuente || '',\n  chat_id: base.chat_id,\n  phone_number_id: base.phone_number_id,\n  session_key: base.session_key,\n  reply: texto,\n  final_text: texto,\n  text: texto,\n  escalar: escalar || motivo.startsWith('BLOQUEO'),\n  motivo_escalamiento: motivo,\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1085,6 +1085,76 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "portal-test",
+              "leftValue": "={{ Boolean($json.body?.source === 'portal_test' || $json.body?.text || $json.body?.message || $json.body?.input || $json.body?.texto || $json.body?.mensaje) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2190,
+        -760
+      ],
+      "id": "96dc16f8-b0df-47da-9cd0-c86620e57e15",
+      "name": "IF Es Prueba Portal"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "modo-prueba",
+              "leftValue": "={{ $json.modo === 'prueba' || $json.fuente === 'Portal prueba' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        720
+      ],
+      "id": "9ae7faef-1284-41e9-ad40-fb8ed75a4a95",
+      "name": "IF Modo Prueba"
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify({ ok: true, reply: $json.reply || $json.final_text || $json.text || '', final_text: $json.final_text || $json.reply || $json.text || '', chat_id: $json.chat_id || '', session_key: $json.session_key || '' }) }}",
         "options": {
@@ -1094,8 +1164,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -240,
-        -1040
+        70,
+        600
       ],
       "id": "9d1b1de1-8596-41f3-8db1-399862f9bf16",
       "name": "Responder prueba INTEC"
@@ -1103,6 +1173,53 @@
   ],
   "connections": {
     "Webhook prueba INTEC": {
+      "main": [
+        [
+          {
+            "node": "IF Verificacion Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Verificacion Meta": {
+      "main": [
+        [
+          {
+            "node": "Responder Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF Es Prueba Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Es Prueba Portal": {
+      "main": [
+        [
+          {
+            "node": "Extraer Datos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder 200 OK": {
       "main": [
         [
           {
@@ -1128,7 +1245,7 @@
       "main": [
         [
           {
-            "node": "IF Es Media",
+            "node": "Switch Tipo Evento",
             "type": "main",
             "index": 0
           }
@@ -1136,6 +1253,93 @@
         [
           {
             "node": "Descartar Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Tipo Evento": {
+      "main": [
+        [
+          {
+            "node": "IF Echo Humano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Entrante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Echo Humano": {
+      "main": [
+        [
+          {
+            "node": "Pausar Bot 15 min",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Echo del Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausar Bot 15 min": {
+      "main": [
+        [
+          {
+            "node": "Memoria Asesor (Echo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Entrante": {
+      "main": [
+        [
+          {
+            "node": "IF Bot Puede Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Bot Puede Responder": {
+      "main": [
+        [
+          {
+            "node": "Marcar Leido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atendido por Humano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Leido": {
+      "main": [
+        [
+          {
+            "node": "IF Es Media",
             "type": "main",
             "index": 0
           }
@@ -1182,28 +1386,6 @@
         ]
       ]
     },
-    "Parser y Guardarraíl": {
-      "main": [
-        [
-          {
-            "node": "Merge Respuesta",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Respuesta": {
-      "main": [
-        [
-          {
-            "node": "Responder prueba INTEC",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "OpenAI Chat Model": {
       "ai_languageModel": [
         [
@@ -1226,67 +1408,81 @@
         ]
       ]
     },
-    "Disponibilidad INTEC": {
-      "ai_tool": [
+    "Parser y Guardarraíl": {
+      "main": [
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "Merge Respuesta",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Respuesta": {
+      "main": [
+        [
+          {
+            "node": "IF Modo Prueba",
+            "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Agendar Visita INTEC": {
-      "ai_tool": [
+    "IF Modo Prueba": {
+      "main": [
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "Responder prueba INTEC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Respuesta WhatsApp",
+            "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "SLOTS_INTEC": {
-      "ai_tool": [
+    "Enviar Respuesta WhatsApp": {
+      "main": [
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "Log Saliente",
+            "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Cancelar Visita INTEC": {
-      "ai_tool": [
+    "Log Saliente": {
+      "main": [
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "IF Escalar",
+            "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Reagendar Visita INTEC": {
-      "ai_tool": [
+    "IF Escalar": {
+      "main": [
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "Correo a Fernando",
+            "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "Identificar Visita INTEC": {
-      "ai_tool": [
+        ],
         [
           {
-            "node": "Agente INTEC",
-            "type": "ai_tool",
+            "node": "Sin Escalamiento",
+            "type": "main",
             "index": 0
           }
         ]
@@ -1389,6 +1585,72 @@
           {
             "node": "Responder envio correcto",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disponibilidad INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar Visita INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLOTS_INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar Visita INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reagendar Visita INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar Visita INTEC": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente INTEC",
+            "type": "ai_tool",
             "index": 0
           }
         ]
