@@ -1,0 +1,1263 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instituto-Intec",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1648,
+        960
+      ],
+      "id": "da045454-4fd0-41d8-b78d-88cc6b40f71c",
+      "name": "Webhook prueba INTEC",
+      "webhookId": "ma-webhook-001",
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "verif-1",
+              "leftValue": "={{ ($json.query && $json.query['hub.mode']) || 'mensaje' }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1424,
+        960
+      ],
+      "id": "4829c754-03e6-4ca5-a044-88735bf58d9f",
+      "name": "IF Verificacion Meta"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        848
+      ],
+      "id": "a1cfe639-b761-46ff-ba7b-0de13113ecbb",
+      "name": "Responder Challenge"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        1056
+      ],
+      "id": "dbea016f-7120-445a-9cbf-18fc62de5348",
+      "name": "Responder 200 OK"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { DateTime } = require('luxon');\n\nconst ZONA = 'America/Mexico_City';\nconst APERTURA = 9;\nconst CIERRE = 21;\n\nconst input = $input.first()?.json || {};\nconst body = input.body || input;\n\nfunction txt(v) {\n  if (v === null || v === undefined) return '';\n  const r = String(v).trim();\n  const b = r.toLowerCase();\n  if (r === '' || r === '[null]' || b === 'null' || b === 'undefined') return '';\n  return r;\n}\n\nconst ahora = DateTime.now().setZone(ZONA);\nconst hora = ahora.hour + ahora.minute / 60;\nconst dentro_de_horario = hora >= APERTURA && hora < CIERRE;\n\n// MODO PRUEBA POR WEBHOOK NORMAL.\n// Acepta el formato que manda el portal y formatos manuales desde Postman/n8n.\nconst text =\n  txt(body.text) ||\n  txt(body.message) ||\n  txt(body.input) ||\n  txt(body.mensaje) ||\n  txt(body.texto) ||\n  txt(body.body);\n\nconst chat_id =\n  txt(body.chat_id) ||\n  txt(body.session_key) ||\n  txt(body.wa_id) ||\n  'portal-test-chat';\n\nconst nombre =\n  txt(body.nombre) ||\n  txt(body.name) ||\n  txt(body.actor) ||\n  txt(body.usuario) ||\n  'Cliente prueba';\n\nconst phone_number_id = txt(body.phone_number_id) || 'intec-prueba';\n\nif (!text) {\n  return [{ json: { ok: false, tipo_evento: 'descartar', error: 'Webhook de prueba sin texto.' } }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    modo: 'prueba',\n    tipo_evento: 'mensaje',\n    chat_id,\n    session_key: `${chat_id}_intec`,\n    phone_number_id,\n    message_id: `test-${Date.now()}`,\n    nombre,\n    tipo_mensaje: 'text',\n    text,\n    media_id: '',\n    es_media: false,\n    es_rancio: false,\n    fuente: 'Webhook de prueba',\n    dentro_de_horario,\n    hora_local: ahora.toFormat('HH:mm'),\n    dia_semana: ahora.setLocale('es').toFormat('cccc')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        1056
+      ],
+      "id": "b2b82353-b2ce-4f30-8d05-a66381fe5093",
+      "name": "Extraer Datos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ok-1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        1056
+      ],
+      "id": "1957551b-bc00-4faf-970e-1ba7cc978fc7",
+      "name": "IF Evento Valido"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        960
+      ],
+      "id": "8461235c-d784-40ad-951e-b6626b5e430b",
+      "name": "Descartar Evento"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipo_evento }}",
+                    "rightValue": "echo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipo_evento }}",
+                    "rightValue": "mensaje",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -528,
+        1152
+      ],
+      "id": "117513dd-e35d-49d9-87e7-0f9d25ee4c32",
+      "name": "Switch Tipo Evento"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "no-bot",
+              "leftValue": "={{ $json.autor_bot }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -304,
+        960
+      ],
+      "id": "52dfa0b1-ebf0-40bb-9922-ae59bf13355f",
+      "name": "IF Echo Humano"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        848
+      ],
+      "id": "9077857e-48eb-4473-8480-6acad9ff9152",
+      "name": "Echo del Bot"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.wa_conversaciones SET\n  pausado_hasta  = now() + interval '15 minutes',\n  pausado_por    = 'celular',\n  ultimo_mensaje = now(),\n  ultimo_texto   = $3,\n  actualizado_en = now()\nWHERE phone_number_id = $1 AND wa_id = $2;",
+        "options": {
+          "queryReplacement": "={{ [ $json.phone_number_id, $json.chat_id, $json.text ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        1056
+      ],
+      "id": "d88703c0-b967-41ad-bba5-69349ff6be43",
+      "name": "Pausar Bot 15 min",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Pausa automatica cuando un humano responde desde el celular."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_chat_histories (session_id, message)\nVALUES (\n  $1,\n  jsonb_build_object(\n    'type', 'ai',\n    'data', jsonb_build_object(\n      'content', $2::text,\n      'additional_kwargs', '{}'::jsonb,\n      'response_metadata', '{}'::jsonb,\n      'tool_calls', '[]'::jsonb,\n      'invalid_tool_calls', '[]'::jsonb\n    )\n  )\n);",
+        "options": {
+          "queryReplacement": "={{ [ $('Extraer Datos').item.json.session_key, '[Mensaje enviado por un asesor humano] ' + $('Extraer Datos').item.json.text ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        144,
+        1056
+      ],
+      "id": "0c412a85-f983-4e99-babe-7bbb195a441b",
+      "name": "Memoria Asesor (Echo)",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Inyecta el mensaje del asesor a la memoria del agente."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH m AS (\n  INSERT INTO wa_mensajes\n    (phone_number_id, wa_id, direccion, autor, tipo, texto, media_id, message_id)\n  VALUES ($1, $2, 'in', 'usuario', $3, $4, NULLIF($5,''), NULLIF($6,''))\n  ON CONFLICT (message_id) DO NOTHING\n)\nINSERT INTO wa_conversaciones\n  (phone_number_id, wa_id, nombre, ultimo_inbound, ultimo_mensaje, ultimo_texto, no_leidos)\nVALUES\n  ($1, $2, NULLIF($7,''), now(), now(), $4, 1)\nON CONFLICT (phone_number_id, wa_id) DO UPDATE SET\n  nombre         = COALESCE(NULLIF(EXCLUDED.nombre,''), wa_conversaciones.nombre),\n  ultimo_inbound = now(),\n  ultimo_mensaje = now(),\n  ultimo_texto   = EXCLUDED.ultimo_texto,\n  no_leidos      = wa_conversaciones.no_leidos + 1\nRETURNING (\n  bot_activo\n  AND (pausado_hasta IS NULL OR pausado_hasta < now())\n) AS bot_puede_responder;",
+        "options": {
+          "queryReplacement": "={{ [ $json.phone_number_id, $json.chat_id, $json.tipo_mensaje, $json.text, $json.media_id, $json.message_id, $json.nombre ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -304,
+        1344
+      ],
+      "id": "60ca7f2b-0b64-40fb-a67e-2f2be4dc6e63",
+      "name": "Log Entrante",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Registra el mensaje y devuelve si el bot puede responder (boton manual + pausa automatica)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bot-on",
+              "leftValue": "={{ $json.bot_puede_responder }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        1344
+      ],
+      "id": "9439e0e0-2646-43b6-86f4-2c375ac4d56d",
+      "name": "IF Bot Puede Responder"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        144,
+        1248
+      ],
+      "id": "fbd3abe4-0c3d-474e-bff0-d402d8a10893",
+      "name": "Atendido por Humano"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v26.0/{{ $('Extraer Datos').item.json.phone_number_id || 'TU_PHONE_NUMBER_ID' }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product:'whatsapp', status:'read', message_id: $('Extraer Datos').item.json.message_id, typing_indicator: { type:'text' } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        144,
+        1440
+      ],
+      "id": "0816c3a4-9413-411c-b37b-0dbbc87a32ac",
+      "name": "Marcar Leido",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tpIpVcEFUnS0o95n",
+          "name": "WhatsApp Cloud API - Green Chimp LT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "media",
+              "leftValue": "={{ $('Extraer Datos').item.json.es_media }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        1440
+      ],
+      "id": "1ec74707-8bf2-46a6-b2cb-4cf43c9f24a2",
+      "name": "IF Es Media"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Extraer Datos').first().json || {};\nconst texto = 'Por ahora la prueba del bot INTEC solo acepta mensajes de texto. Escríbeme tu duda y con gusto te ayudo.';\nreturn [{ json: {\n  ok: true,\n  chat_id: base.chat_id,\n  phone_number_id: base.phone_number_id,\n  session_key: base.session_key,\n  reply: texto,\n  final_text: texto,\n  escalar: false,\n  motivo_escalamiento: ''\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        1312
+      ],
+      "id": "b199a1ae-28f9-4344-b243-3e31082b3b5a",
+      "name": "Respuesta Media"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Extraer Datos').item.json.text }}\n\nHora local: {{ $('Extraer Datos').item.json.hora_local }}\nDia: {{ $('Extraer Datos').item.json.dia_semana }}\ndentro_de_horario: {{ $('Extraer Datos').item.json.dentro_de_horario }}",
+        "options": {
+          "systemMessage": "=## IDENTIDAD\n\nEres quien atiende el WhatsApp de **Universidad INTEC Colima** (Instituto de Formación Académica INTEC A.C.), institución educativa en Colima, Colima. Ofrecemos Bachillerato General Semiescolarizado, Licenciatura en Derecho y Licenciatura en Pedagogía.\n\nHablas **de tú**. Usas pocos emojis, bien puestos, nunca más de dos por mensaje. No dices que eres un bot, asistente virtual ni inteligencia artificial; si te lo preguntan directo, respondes con naturalidad y sigues ayudando.\n\nMensajes cortos. Una o dos ideas por mensaje, no párrafos largos. Nada de listas con viñetas ni formato markdown: esto es WhatsApp.\n\n---\n\n## DATOS DE LA INSTITUCIÓN\n\n- **Oferta educativa:** Bachillerato General Semiescolarizado (RVOE SE-010-2023-EMS), Licenciatura en Derecho (RVOE SE y C-004-2024-ES, modalidad no escolarizada cuatrimestral), Licenciatura en Pedagogía (RVOE SE y C-005-2024-ES, modalidad no escolarizada cuatrimestral). Todas tienen validez oficial ante la Secretaría de Educación del Estado de Colima — si preguntan, puedes citar el número de acuerdo.\n- **Modalidad:** en línea y presencial. El bachillerato semiescolarizado tiene opción sabatina de 8:00am a 2:00pm.\n- **Duración:** Bachillerato 2 años. Licenciaturas 9 cuatrimestres.\n- **Ubicación:** Aquiles Serdán #394, Jardines de la Corregidora, Colima Centro.\n- **Horario de atención:** 9:00am a 6:00pm.\n- **Contacto:** WhatsApp/tel 312 166 3814. Sitio web www.intec.edu.mx.\n\n### Precios vigentes (confirmar con Fernando antes de repetir tal cual, la promo de bachillerato vence pronto)\n\n- **Bachillerato:** inscripción gratis, mensualidad $1,200, reinscripción cuatrimestral gratis, anualidad $350, uniforme gratis.\n- **Licenciatura (Derecho o Pedagogía):** inscripción gratis, mensualidad $1,350, reinscripción cuatrimestral gratis, anualidad $350, uniforme gratis.\n- Para apartar lugar solo se necesita cubrir la anualidad de $350.\n\n### Formas de pago\n\nEfectivo, transferencia bancaria, tarjeta de crédito o aplicación bancaria (SPN by Oxxo, Nu Kiosko, Afirme). El comprobante de pago se manda a universidad@intec.edu.mx.\n\n---\n\n## LO QUE NO DEBES PROMETER\n\nNunca ofrezcas ni insinúes que se estudia en \"menos tiempo\" del que dura el plan (2 años bachillerato, 9 cuatrimestres licenciatura). Si preguntan por atajos o si se puede terminar más rápido, aclara la duración real.\n\n---\n\n## TU TRABAJO\n\n1. Resolver dudas sobre planes de estudio, costos, modalidad, validez oficial y proceso de inscripción usando la información de este documento.\n2. Si el prospecto quiere conocer el plantel, **agendar una visita** usando las herramientas de calendario disponibles.\n3. Si el prospecto ya tiene una visita agendada y quiere cambiarla o cancelarla, usar las herramientas correspondientes.\n4. Si preguntan algo que no está aquí, o piden hablar con una persona, o detectas molestia o frustración: escalas.\n\n### Cómo agendar una visita\n\n- Usa la herramienta de disponibilidad para consultar horarios libres antes de ofrecer una fecha.\n- Cada visita dura 20 minutos. Hay servicio de lunes a sábado, de 9:00am a 6:00pm.\n- Pide primero: nombre completo y si le interesa Bachillerato, Derecho o Pedagogía.\n- Confirma la cita con fecha y hora exactas una vez agendada en el calendario. No inventes horarios sin haber consultado la disponibilidad real.\n- Si piden cambiar o cancelar, usa primero la herramienta para identificar la cita existente antes de modificarla.\n\n### Cuándo escalas\n\n- Piden hablar con una persona.\n- Preguntan algo que no está en este documento (por ejemplo, requisitos de documentos muy específicos, becas, convenios).\n- Detectas molestia o frustración.\n- Antes de dar información sensible que no debas confirmar tú mismo (por ejemplo, si preguntan por descuentos adicionales a los ya listados).\n\nAl escalar, contesta con naturalidad y termina tu mensaje con la marca `[[ESCALAR]]` en la última línea, siempre sola. El cliente nunca la ve; el sistema la usa para avisar al asesor. Si no escalas, no la pongas.\n\n---\n\n## CONTEXTO DE LA CONVERSACIÓN\n\n- Hora local actual: `{{ hora_local }}`\n- Día: `{{ dia_semana }}`\n- Dentro de horario de atención (9am a 6pm): `{{ dentro_de_horario }}`\n\nSi en el historial ves mensajes escritos por un asesor humano, ya se atendió esa parte. No repitas el ofrecimiento de pasar con un asesor ni vuelvas a preguntar lo que el asesor ya resolvió. Continúa desde donde se quedó.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        592,
+        1552
+      ],
+      "id": "20a7ada4-49c8-4453-8c22-9b7b2780fe19",
+      "name": "Agente INTEC",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list"
+        },
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        1776
+      ],
+      "id": "2230bea0-ff42-4438-a0f5-0bf14a900537",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "9v16Hv6w9c7piuyy",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extraer Datos').item.json.session_key }}",
+        "contextWindowLength": 12
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        1776
+      ],
+      "id": "472573ea-b5f3-428e-9e1d-f473228aa36b",
+      "name": "Memoria Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Limpia la salida del agente y devuelve un formato que el portal entiende.\nconst base = $('Extraer Datos').first().json || {};\nconst raw = $input.first().json || {};\n\nlet texto = String(raw.output ?? raw.text ?? raw.reply ?? '').trim();\n\nconst MARCA = '[[ESCALAR]]';\nconst escalar = texto.includes(MARCA);\ntexto = texto.split(MARCA).join('').trim();\n\nconst REGEX_PRECIO = /(\\$\\s?\\d|(\\d{3,5})\\s?(pesos|mxn))/i;\nlet motivo = escalar ? 'El agente marco escalamiento' : '';\nif (REGEX_PRECIO.test(texto)) {\n  texto = base.dentro_de_horario\n    ? 'Permíteme confirmar disponibilidad y en un momento un asesor te comparte el costo exacto.'\n    : 'Mañana a primera hora un asesor te confirma disponibilidad y el costo exacto.';\n  motivo = 'BLOQUEO: el agente intento dar un precio';\n}\n\nif (!texto) texto = 'Permíteme un momento, en seguida te atiendo.';\nif (texto.length > 4096) texto = texto.slice(0, 4093) + '...';\n\nreturn [{\n  json: {\n    ok: true,\n    chat_id: base.chat_id,\n    phone_number_id: base.phone_number_id,\n    session_key: base.session_key,\n    reply: texto,\n    final_text: texto,\n    escalar: escalar || motivo.startsWith('BLOQUEO'),\n    motivo_escalamiento: motivo\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        1552
+      ],
+      "id": "996fcbce-8f01-4886-a4de-a58cac169bbe",
+      "name": "Parser y Guardarraíl"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1168,
+        1440
+      ],
+      "id": "5d5ce6a0-0eca-4d47-998a-16da3447eb50",
+      "name": "Merge Respuesta"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v26.0/{{ $json.phone_number_id || 'TU_PHONE_NUMBER_ID' }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product:'whatsapp', recipient_type:'individual', to: $json.chat_id, type:'text', text: { preview_url:false, body: $json.final_text } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1424,
+        1440
+      ],
+      "id": "ff2548be-c715-4645-b653-7e40d88f24cc",
+      "name": "Enviar Respuesta WhatsApp",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tpIpVcEFUnS0o95n",
+          "name": "WhatsApp Cloud API - Green Chimp LT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH m AS (\n  INSERT INTO wa_mensajes\n    (phone_number_id, wa_id, direccion, autor, tipo, texto, message_id)\n  VALUES ($1, $2, 'out', 'bot', 'text', $3, NULLIF($4,''))\n  ON CONFLICT (message_id) DO NOTHING\n)\nUPDATE wa_conversaciones SET\n  ultimo_mensaje = now(),\n  ultimo_texto   = $3\nWHERE phone_number_id = $1 AND wa_id = $2;",
+        "options": {
+          "queryReplacement": "={{ [ $('Merge Respuesta').item.json.phone_number_id, $('Merge Respuesta').item.json.chat_id, $('Merge Respuesta').item.json.final_text, $json.messages ? $json.messages[0].id : '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1648,
+        1440
+      ],
+      "id": "f21383ec-c320-4898-bd9a-666c2e9bb64c",
+      "name": "Log Saliente",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "esc",
+              "leftValue": "={{ $('Merge Respuesta').item.json.escalar }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1872,
+        1440
+      ],
+      "id": "ea8abae3-8aeb-4920-932b-9a70d2904e35",
+      "name": "IF Escalar"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        1536
+      ],
+      "id": "cccb3a55-41a7-41b0-a74a-d70f451f2d5d",
+      "name": "Sin Escalamiento"
+    },
+    {
+      "parameters": {
+        "fromEmail": "contacto@greenchimp.mx",
+        "toEmail": "universidad@intec.edu.mx",
+        "subject": "=Lead para atender - {{ $('Extraer Datos').item.json.nombre || $('Extraer Datos').item.json.chat_id }}",
+        "emailFormat": "text",
+        "text": "=Se escalo una conversacion de WhatsApp.\n\nCliente: {{ $('Extraer Datos').item.json.nombre || 'sin nombre' }}\nTelefono: {{ $('Extraer Datos').item.json.chat_id }}\nHora local: {{ $('Extraer Datos').item.json.hora_local }} ({{ $('Extraer Datos').item.json.dia_semana }})\nDentro de horario: {{ $('Extraer Datos').item.json.dentro_de_horario }}\n\nMotivo: {{ $('Merge Respuesta').item.json.motivo_escalamiento }}\n\nUltimo mensaje del cliente:\n{{ $('Extraer Datos').item.json.text }}\n\nRespuesta que envio el bot:\n{{ $('Merge Respuesta').item.json.final_text }}\n\nAbrir chat: https://wa.me/{{ $('Extraer Datos').item.json.chat_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2096,
+        1344
+      ],
+      "id": "ec5701c8-43d7-40ba-9b98-d9e51ac98e77",
+      "name": "Correo a Fernando",
+      "webhookId": "cc040c19-bda3-4412-8fe6-ec74e9c4672e",
+      "credentials": {
+        "smtp": {
+          "id": "josAeXtltpfsU6ah",
+          "name": "SMTP account CONTACTO"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Requiere credencial SMTP. Cambiar por nodo Gmail si se prefiere."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "portal-enviar-ma-ins",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1648,
+        2080
+      ],
+      "id": "c5f354d5-e324-424a-9779-122ba663d05e",
+      "name": "POST portal enviar",
+      "webhookId": "ma-portal-001",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nconst body = input.body || input;\nconst headers = input.headers || {};\nconst configuredSecret = String($env.N8N_PORTAL_KEY || '').trim();\nconst receivedSecret = String(headers['x-portal-key'] || headers['X-Portal-Key'] || '').trim();\n\nif (!configuredSecret) {\n  return [{ json: { ok:false, authorized:false, statusCode:500, error:'N8N_PORTAL_KEY no esta configurada en n8n.' } }];\n}\nif (!receivedSecret || receivedSecret !== configuredSecret) {\n  return [{ json: { ok:false, authorized:false, statusCode:401, error:'No autorizado.' } }];\n}\n\nconst phone_number_id = String(body.phone_number_id || '').trim();\nconst wa_id = String(body.wa_id || '').trim();\nconst texto = String(body.texto || '').trim();\nconst usuario = String(body.usuario || '').trim();\n\nif (!phone_number_id || !wa_id || !texto || !usuario || texto.length > 4096) {\n  return [{ json: { ok:false, authorized:false, statusCode:400, error:'Solicitud invalida.' } }];\n}\n\nreturn [{ json: { ok:true, authorized:true, statusCode:200, phone_number_id, wa_id, texto, usuario, session_key: wa_id + '_ma' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1424,
+        2080
+      ],
+      "id": "92080b01-1859-48fa-ad3f-035f89b42652",
+      "name": "Validar clave y solicitud"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "auth-ok",
+              "leftValue": "={{ $json.authorized }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1200,
+        2080
+      ],
+      "id": "93792b00-926e-43d7-b3a6-c13e3f0ffe27",
+      "name": "IF solicitud valida"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error:$json.error }) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -976,
+        2176
+      ],
+      "id": "69d35f89-6544-4eb9-ad26-dad443ef41a4",
+      "name": "Responder error solicitud"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COALESCE((\n    SELECT (now() - ultimo_inbound) < interval '24 hours'\n    FROM public.wa_conversaciones\n    WHERE phone_number_id = $1 AND wa_id = $2\n    LIMIT 1\n  ), false) AS ventana_abierta;",
+        "options": {
+          "queryReplacement": "={{ [ $json.phone_number_id, $json.wa_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -976,
+        1984
+      ],
+      "id": "e1f4eb35-28af-4433-bebe-c775141550ed",
+      "name": "Verificar ventana",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "win",
+              "leftValue": "={{ $json.ventana_abierta }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        1984
+      ],
+      "id": "7b254f56-d04c-4e9c-84a1-d754ccd7980a",
+      "name": "IF ventana abierta"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error:'La ventana de 24 horas esta cerrada.' }) }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -528,
+        2080
+      ],
+      "id": "8bc7b0d2-5e86-4595-9acc-0b6a2c410162",
+      "name": "Responder ventana cerrada"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v26.0/{{ $('Validar clave y solicitud').item.json.phone_number_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product:'whatsapp', recipient_type:'individual', to: $('Validar clave y solicitud').item.json.wa_id, type:'text', text: { preview_url:false, body: $('Validar clave y solicitud').item.json.texto } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -528,
+        1888
+      ],
+      "id": "1034928c-eb07-4755-9879-f976295a313d",
+      "name": "Enviar mensaje portal",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tpIpVcEFUnS0o95n",
+          "name": "WhatsApp Cloud API - Green Chimp LT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH datos AS (\n  SELECT $1::text AS phone_number_id, $2::text AS wa_id, $3::text AS texto,\n         $4::text AS usuario, $5::text AS message_id\n), mensaje AS (\n  INSERT INTO public.wa_mensajes\n    (phone_number_id, wa_id, direccion, autor, tipo, texto, message_id, estado)\n  SELECT phone_number_id, wa_id, 'out', usuario, 'text', texto, message_id, 'accepted'\n  FROM datos\n  ON CONFLICT (message_id) DO NOTHING\n)\nUPDATE public.wa_conversaciones c SET\n  bot_activo     = false,\n  pausado_en     = now(),\n  pausado_por    = d.usuario,\n  ultimo_mensaje = now(),\n  ultimo_texto   = d.texto,\n  actualizado_en = now()\nFROM datos d\nWHERE c.phone_number_id = d.phone_number_id AND c.wa_id = d.wa_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validar clave y solicitud').item.json.phone_number_id, $('Validar clave y solicitud').item.json.wa_id, $('Validar clave y solicitud').item.json.texto, $('Validar clave y solicitud').item.json.usuario, $json.messages[0].id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -304,
+        1888
+      ],
+      "id": "e9a79ef8-e0a4-4d49-b5a9-a035c4dc924f",
+      "name": "Pausar bot (portal)",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "notes": "Pausa INDEFINIDA. Solo el boton Reanudar del portal la revierte."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_chat_histories (session_id, message)\nVALUES (\n  $1,\n  jsonb_build_object(\n    'type', 'ai',\n    'data', jsonb_build_object(\n      'content', $2::text,\n      'additional_kwargs', '{}'::jsonb,\n      'response_metadata', '{}'::jsonb,\n      'tool_calls', '[]'::jsonb,\n      'invalid_tool_calls', '[]'::jsonb\n    )\n  )\n);",
+        "options": {
+          "queryReplacement": "={{ [ $('Validar clave y solicitud').item.json.session_key, '[Mensaje enviado por un asesor humano] ' + $('Validar clave y solicitud').item.json.texto ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        1888
+      ],
+      "id": "49723e15-d7c5-4ab2-8bcb-e31959e78dfe",
+      "name": "Memoria Asesor (Portal)",
+      "credentials": {
+        "postgres": {
+          "id": "Cpk8ls3nVc2hXeAN",
+          "name": "SUPABASE"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:true, bot_activo:false }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        144,
+        1888
+      ],
+      "id": "59d849d1-db4e-43c0-a134-56d58d35d0cf",
+      "name": "Responder envio correcto"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "PENDIENTE_CALENDAR_ID_INTEC@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Universidad INTEC Colima"
+        },
+        "returnAll": true,
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        1856
+      ],
+      "id": "ff5dcf48-f475-4166-9ab7-7e0bc7b14220",
+      "name": "Disponibilidad INTEC",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "XSs7bjZWIfqr54nn",
+          "name": "Google Calendar Esp. Dentales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "PENDIENTE_CALENDAR_ID_INTEC@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Universidad INTEC Colima"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "={{ \n  'Teléfono del prospecto: ' +\n  ($('Extraer Datos').first().json.from || '') +\n  '\\nChat ID: ' +\n  ($('Extraer Datos').first().json.chat_id || '')\n}}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        1856
+      ],
+      "id": "bda56a56-688d-4314-bfee-9e8e7f6baa1f",
+      "name": "Agendar Visita INTEC",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "XSs7bjZWIfqr54nn",
+          "name": "Google Calendar Esp. Dentales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Genera slots de 20 min disponibles para visitas al plantel de Universidad INTEC Colima. Horario: Lunes a Sabado 09:00-18:00, hasta 2 visitas simultaneas por franja. Devuelve slots_top (max 6), queryAfterISO/queryBeforeISO, is_free, status.",
+        "jsCode": "// Code Tool (Agents): debe regresar un solo STRING (JSON.stringify).\n// SLOTS_INTEC — Universidad INTEC Colima\n//\n// Horario (PENDIENTE confirmar detalle por dia con Fernando):\n// - Lunes a Sabado: 09:00–18:00\n// - Domingo: no hay servicio\n//\n// Duracion de cita: 20 minutos.\n// Hasta 2 visitas simultaneas por franja (MAX_PARALLEL = 2).\n//\n// Reglas de ocupacion:\n// - CUALQUIER evento de dia completo bloquea toda la fecha.\n// - Un slot solo se considera ocupado cuando ya hay 2 eventos traslapados (MAX_PARALLEL).\n// - Los eventos cancelados no bloquean.\n\nconst TZ = \"America/Mexico_City\";\nconst OFFSET = \"-06:00\";\n\nfunction pad2(n) { return String(n).padStart(2, \"0\"); }\nfunction safeString(v) { return v === undefined || v === null ? \"\" : String(v).trim(); }\nfunction safeLower(v) { return safeString(v).toLowerCase(); }\nfunction isObject(v) { return v !== null && typeof v === \"object\" && !Array.isArray(v); }\nfunction hasOwn(obj, key) { return !!obj && Object.prototype.hasOwnProperty.call(obj, key); }\nfunction truthy(v) { if (v === true) return true; const s = safeLower(v); return s === \"true\" || s === \"1\" || s === \"yes\" || s === \"si\" || s === \"sí\"; }\nfunction tryParseJSON(v) { if (typeof v !== \"string\") return v; const s = v.trim(); if (!s) return v; try { return JSON.parse(s); } catch (_) { return v; } }\nfunction deepParse(value, maxDepth = 6) { let current = value; for (let i = 0; i < maxDepth; i++) { const parsed = tryParseJSON(current); if (parsed === current) break; current = parsed; } return current; }\nfunction normalizeText(v) { return safeString(v).toLowerCase().normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\").replace(/\\s+/g, \" \").trim(); }\nfunction parseISODate(dateStr) { const m = String(dateStr || \"\").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/); if (!m) return null; return { y: +m[1], mo: +m[2], d: +m[3] }; }\nfunction addDaysISO(dateStr, add) { const p = parseISODate(dateStr); if (!p) return null; const dt = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dt.setUTCDate(dt.getUTCDate() + add); return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`; }\nfunction isoDow(dateStr) { const p = parseISODate(dateStr); if (!p) return null; return new Date(Date.UTC(p.y, p.mo - 1, p.d)).getUTCDay(); }\nfunction labelEs(dateStr) { const p = parseISODate(dateStr); if (!p) return \"\"; const dt = new Date(Date.UTC(p.y, p.mo - 1, p.d, 12, 0, 0)); return dt.toLocaleDateString(\"es-MX\", { weekday: \"long\", day: \"numeric\", month: \"long\", year: \"numeric\", timeZone: TZ }).replace(\",\", \"\"); }\nfunction hmToMin(hm) { const m = String(hm || \"\").match(/^(\\d{1,2}):(\\d{2})$/); if (!m) return null; const hh = +m[1]; const mm = +m[2]; if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null; return hh * 60 + mm; }\nfunction minToHM(min) { return `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`; }\nfunction buildISO(date, min) { return `${date}T${minToHM(min)}:00${OFFSET}`; }\nfunction fullDayQueryRange(date) {\n  const nextDate = addDaysISO(date, 1);\n  return {\n    after: `${date}T00:00:00${OFFSET}`,\n    before: nextDate ? `${nextDate}T00:00:00${OFFSET}` : `${date}T23:59:59${OFFSET}`\n  };\n}\nfunction overlaps(aS, aE, bS, bE) { return aS < bE && aE > bS; }\n\nconst DAY_WORDS = [\n  { k: [\"domingo\"], dow: 0 }, { k: [\"lunes\"], dow: 1 }, { k: [\"martes\"], dow: 2 },\n  { k: [\"miercoles\"], dow: 3 }, { k: [\"jueves\"], dow: 4 }, { k: [\"viernes\"], dow: 5 }, { k: [\"sabado\"], dow: 6 }\n];\n\nconst MESES_MAP = { enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8, septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12 };\n\nfunction parseExplicitDateFromText(text, baseDate) {\n  const s = normalizeText(text);\n  const baseP = parseISODate(baseDate);\n  const baseYear = baseP ? baseP.y : new Date().getFullYear();\n\n  // Detectar si hay intención de \"después de\" / \"a partir de\" / \"posterior a\"\n  const isAfter = /\\b(despues|posterior|a partir|mas adelante|mas tarde)\\b/.test(s);\n\n  // Patrón: \"23 de junio\" o \"23 de junio de 2026\" o \"junio 23\"\n  let day = null, month = null, year = null;\n\n  const mDayMonth = s.match(/\\b(\\d{1,2})\\s*(?:de\\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\\s*(?:de|del)?\\s*(\\d{4}))?\\b/);\n  if (mDayMonth) {\n    day = parseInt(mDayMonth[1]);\n    month = MESES_MAP[mDayMonth[2]];\n    year = mDayMonth[3] ? parseInt(mDayMonth[3]) : baseYear;\n  } else {\n    // Patrón: \"junio 23\" (mes primero)\n    const mMonthDay = s.match(/\\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\\s*(\\d{1,2})\\b/);\n    if (mMonthDay) {\n      month = MESES_MAP[mMonthDay[1]];\n      day = parseInt(mMonthDay[2]);\n      year = baseYear;\n    } else {\n      // Patrón: solo número de día (\"el 23\", \"puedo el 23\", \"para el 23\")\n      // Solo aplica si NO hay palabra de día de semana ni \"mañana\"/\"hoy\" en el texto\n      const hasWeekday = DAY_WORDS.some(d => d.k.some(k => s.includes(k)));\n      const hasRelative = s.includes(\"hoy\") || s.includes(\"manana\") || s.includes(\"pasado manana\");\n      if (!hasWeekday && !hasRelative) {\n        const mOnlyDay = s.match(/\\b(?:el|para el|puedo el|dia)\\s*(\\d{1,2})\\b(?!\\s*(?::|am|pm|hrs|horas))/);\n        if (mOnlyDay) {\n          day = parseInt(mOnlyDay[1]);\n          // Usa el mes/año base; si el día ya pasó este mes, usa el siguiente mes\n          month = baseP ? baseP.mo : (new Date()).getMonth() + 1;\n          year = baseYear;\n        }\n      }\n    }\n  }\n\n  if (day === null || month === null || day < 1 || day > 31 || month < 1 || month > 12) {\n    return { date: null, isAfter };\n  }\n\n  // Construir fecha candidata\n  let candidate = `${year}-${pad2(month)}-${pad2(day)}`;\n\n  // Si la fecha candidata ya pasó respecto a baseDate, y no se especificó año explícito, avanzar al año siguiente\n  if (baseDate && candidate < baseDate) {\n    const explicitYear = mDayMonth && mDayMonth[3];\n    if (!explicitYear) {\n      candidate = `${year + 1}-${pad2(month)}-${pad2(day)}`;\n    }\n  }\n\n  return { date: candidate, isAfter };\n}\n\n\nfunction findNextWeekday(baseDate, wantDow) { const baseDow = isoDow(baseDate); if (baseDow === null) return null; let add = wantDow - baseDow; if (add < 0) add += 7; return addDaysISO(baseDate, add); }\n\nfunction parseTimeFromText(text) {\n  const s = normalizeText(text);\n  const mAmPm = s.match(/(?:^|\\s)(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)(?:\\s|$)/);\n  if (mAmPm) { let hh = +mAmPm[1]; const mm = mAmPm[2] ? +mAmPm[2] : 0; const ap = mAmPm[3]; if (mm < 0 || mm > 59) return null; if (hh < 1 || hh > 12) return null; if (hh === 12) hh = 0; if (ap === \"pm\") hh += 12; if (hh < 0 || hh > 23) return null; return `${pad2(hh)}:${pad2(mm)}`; }\n  const m24 = s.match(/(?:^|\\s)(\\d{1,2}):(\\d{2})(?:\\s|$)/);\n  if (m24) { const hh = +m24[1]; const mm = +m24[2]; if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null; return `${pad2(hh)}:${pad2(mm)}`; }\n  return null;\n}\n\nfunction detectTurn(text) {\n  const s = normalizeText(text);\n  const hasTarde = s.includes(\"tarde\") || s.includes(\"turno tarde\") || s.includes(\"en la tarde\") || s.includes(\"por la tarde\") || s.includes(\"segundo turno\");\n  const hasManana = s.includes(\"manana\") || s.includes(\"matutino\") || s.includes(\"en la manana\") || s.includes(\"por la manana\") || s.includes(\"temprano\") || s.includes(\"primer turno\") || s.includes(\"1er turno\") || s.includes(\"turno de manana\");\n  if (hasTarde && !hasManana) return \"TARDE\";\n  if (hasManana && !hasTarde) return \"MANANA\";\n  if (hasTarde && hasManana) return \"AMBIGUO\";\n  return \"\";\n}\n\nfunction windowsForDate(date) {\n  const dow = isoDow(date);\n  if (dow === null) return [];\n  if (dow === 0) return []; // domingo cerrado\n  return [{ name: \"GENERAL\", start: 9 * 60, end: 18 * 60 }];\n}\n\nfunction nextDateWithTurn(baseDate, turn) { let d = baseDate; for (let i = 0; i < 14; i++) { const ws = windowsForDate(d); if (ws.some(x => x.name === turn)) return d; d = addDaysISO(d, 1); if (!d) break; } return null; }\nfunction isDateInAllDayRange(target, startDate, endDateExclusive) { if (!startDate || !endDateExclusive) return false; return target >= startDate && target < endDateExclusive; }\nfunction nextFallbackDate(targetDate) { let d = targetDate; for (let i = 0; i < 14; i++) { d = addDaysISO(d, 1); if (!d) return \"\"; if (windowsForDate(d).length > 0) return d; } return \"\"; }\n\nfunction nextServiceDateOnOrAfter(date) {\n  let d = date;\n  for (let i = 0; i < 14; i++) {\n    if (!d) return \"\";\n    if (windowsForDate(d).length > 0) return d;\n    d = addDaysISO(d, 1);\n  }\n  return \"\";\n}\n\nlet payload = {};\ntry { if (typeof input === \"object\" && input) { payload = { ...input }; } else if (typeof input === \"string\" && input.trim()) { const parsedInput = deepParse(input); if (isObject(parsedInput)) { payload = { ...parsedInput }; } else { payload = { input: String(input) }; } } } catch (_) {}\ntry { if (typeof query === \"object\" && query) { payload = { ...query, ...payload }; } else if (typeof query === \"string\" && query.trim()) { const parsedQuery = deepParse(query); if (isObject(parsedQuery)) { payload = { ...parsedQuery, ...payload }; } else if (!payload.input) { payload.input = String(query); } } } catch (_) {}\ntry { if (payload && typeof payload.query === \"string\" && payload.query.trim()) { const q = deepParse(payload.query); if (isObject(q)) { payload = { ...payload, ...q }; } else if (!payload.input) { payload.input = String(payload.query); } } else if (payload && isObject(payload.query)) { payload = { ...payload, ...payload.query }; } } catch (_) {}\ntry { if (payload && typeof payload.response === \"string\" && payload.response.trim()) { const r = deepParse(payload.response); if (isObject(r)) payload = { ...payload, ...r }; } else if (payload && isObject(payload.response)) { payload = { ...payload, ...payload.response }; } } catch (_) {}\ntry { if (typeof $json === \"object\" && $json) { payload = { ...$json, ...payload }; } } catch (_) {}\n\nconst text = safeString(payload.input || payload.mensaje || payload.text || payload.message || payload.prompt || payload.userMessage || \"\");\nconst normalizedText = normalizeText(text);\n\n// Conserva el día de la semana pedido explícitamente.\n// Ejemplo: \"para el jueves\" bloqueado -> jueves de la siguiente semana.\nlet requestedWeekdayDow = null;\nlet requestedWeekdayName = \"\";\n\nfor (const dayWord of DAY_WORDS) {\n  if (dayWord.k.some(k => normalizedText.includes(k))) {\n    requestedWeekdayDow = dayWord.dow;\n    requestedWeekdayName = dayWord.k[0];\n    break;\n  }\n}\n\n// ======================================================\n// CONTEXTO DE LA PROPUESTA ANTERIOR\n// ======================================================\n//\n// Primera consulta:\n// \"¿Tienen citas para el miércoles?\"\n// Si está bloqueado, se busca la PRIMERA fecha disponible.\n//\n// Elección posterior:\n// El bot ya ofreció lunes 27 y el paciente responde\n// \"Puede ser para el jueves\".\n// Se debe buscar jueves 30, nunca volver al jueves 23.\n\nlet previousBotMessage = safeString(\n  payload.previous_bot_message ||\n  payload.previousBotMessage ||\n  payload.ultimo_mensaje_bot ||\n  \"\"\n);\n\n// Intentar recuperar automáticamente el último mensaje guardado.\ntry {\n  if (!previousBotMessage) {\n    previousBotMessage = safeString(\n      $(\"Edit Fields12\").item.json.ultimo_mensaje_bot || \"\"\n    );\n  }\n} catch (_) {}\n\nconst nowCdmxISO = safeString(payload.nowCdmxISO || payload.now || \"\");\nconst baseDate = /^\\d{4}-\\d{2}-\\d{2}/.test(nowCdmxISO)\n  ? nowCdmxISO.slice(0, 10)\n  : \"\";\n\nconst normalizedPreviousBot = normalizeText(previousBotMessage);\n\nconst previousBotOfferedAvailability =\n  (\n    normalizedPreviousBot.includes(\"tengo estos horarios\") ||\n    normalizedPreviousBot.includes(\"estos horarios disponibles\") ||\n    normalizedPreviousBot.includes(\"para ese dia tengo\") ||\n    normalizedPreviousBot.includes(\"cual te acomoda\") ||\n    normalizedPreviousBot.includes(\"volver a tener citas\") ||\n    normalizedPreviousBot.includes(\"volvera a tener citas\") ||\n    normalizedPreviousBot.includes(\"a partir del\")\n  ) &&\n  (\n    normalizedPreviousBot.includes(\"horario\") ||\n    normalizedPreviousBot.includes(\"cita\") ||\n    normalizedPreviousBot.includes(\"disponibilidad\")\n  );\n\nconst currentLooksLikeDayChoice =\n  requestedWeekdayDow !== null &&\n  (\n    normalizedText.includes(\"puede ser\") ||\n    normalizedText.includes(\"mejor\") ||\n    normalizedText.includes(\"prefiero\") ||\n    normalizedText.includes(\"entonces\") ||\n    normalizedText.includes(\"y para\") ||\n    normalizedText.includes(\"que sea\") ||\n    normalizedText.includes(\"para el\") ||\n    normalizedText.includes(\"para este\") ||\n    normalizedText.includes(\"para ese\") ||\n    normalizedText.split(\" \").length <= 6\n  );\n\nlet notBeforeDate = safeString(\n  payload.not_before_date ||\n  payload.notBeforeDate ||\n  payload.availability_from_date ||\n  \"\"\n);\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(notBeforeDate)) {\n  notBeforeDate = \"\";\n}\n\n// Extraer la fecha ofrecida del mensaje anterior.\n// Ejemplo: \"lunes 27 de julio de 2026\".\nif (!notBeforeDate && previousBotOfferedAvailability && baseDate) {\n  const parsedPreviousOffer = parseExplicitDateFromText(\n    previousBotMessage,\n    baseDate\n  );\n\n  if (parsedPreviousOffer.date) {\n    notBeforeDate = parsedPreviousOffer.date;\n  }\n}\n\nconst inferredFollowUpDayChoice =\n  previousBotOfferedAvailability &&\n  currentLooksLikeDayChoice &&\n  !!notBeforeDate;\n\n// false -> primera fecha disponible.\n// true  -> conservar el día elegido después de una propuesta.\nconst preserveRequestedWeekday =\n  truthy(payload.preserve_requested_weekday) ||\n  truthy(payload.preserveRequestedWeekday) ||\n  safeString(payload.fallback_mode).toUpperCase() === \"SAME_WEEKDAY\" ||\n  inferredFollowUpDayChoice;\n\nconst explicitDate = safeString(payload.date || \"\");\nlet targetDate = \"\";\n\n// En una elección posterior, la fecha mínima ofrecida manda sobre\n// cualquier fecha antigua que el agente haya calculado.\nif (\n  preserveRequestedWeekday &&\n  requestedWeekdayDow !== null &&\n  /^\\d{4}-\\d{2}-\\d{2}$/.test(notBeforeDate)\n) {\n  targetDate = findNextWeekday(notBeforeDate, requestedWeekdayDow) || \"\";\n}\n\nif (!targetDate && /^\\d{4}-\\d{2}-\\d{2}$/.test(explicitDate)) {\n  targetDate = explicitDate;\n} else if (!targetDate) {\n  // PRIORIDAD MÁXIMA: fecha explícita en el texto (\"23 de junio\", \"después del 23\", \"el 23\")\n  let _afterConstraintDate = null;\n  const _explicitParsed = parseExplicitDateFromText(text, baseDate);\n  if (_explicitParsed.date) {\n    if (_explicitParsed.isAfter) {\n      // \"después del 23 de junio\" → buscar el día hábil siguiente a esa fecha (no esa fecha misma)\n      _afterConstraintDate = addDaysISO(_explicitParsed.date, 1);\n      targetDate = _afterConstraintDate;\n    } else {\n      // Fecha explícita directa (\"23 de junio\", \"el 23\")\n      targetDate = _explicitParsed.date;\n    }\n  }\n\n  // \"próxima semana\", \"otra semana\", \"la que viene\", \"siguiente semana\"\n  const _isNextWeek = normalizedText.includes(\"proxima semana\") ||\n                      normalizedText.includes(\"la proxima semana\") ||\n                      normalizedText.includes(\"siguiente semana\") ||\n                      normalizedText.includes(\"otra semana\") ||\n                      normalizedText.includes(\"la otra semana\") ||\n                      normalizedText.includes(\"la que viene\") ||\n                      normalizedText.includes(\"la proxima\");\n  if (_isNextWeek) {\n    if (baseDate) {\n      // Si menciona un día de la semana específico, buscar ese día la PRÓXIMA semana (no esta)\n      let _foundDayNextWeek = false;\n      for (const _dw of DAY_WORDS) {\n        if (_dw.k.some(k => normalizedText.includes(k))) {\n          // Saltar a la próxima semana primero, luego buscar ese día\n          const _nextMonday = addDaysISO(baseDate, (8 - isoDow(baseDate)) % 7 || 7);\n          const _nextWeekStart = _nextMonday;\n          let _d = _nextWeekStart;\n          for (let _i = 0; _i < 7; _i++) {\n            if (isoDow(_d) === _dw.dow) { targetDate = _d; _foundDayNextWeek = true; break; }\n            _d = addDaysISO(_d, 1);\n          }\n          break;\n        }\n      }\n      // Si no especificó día, ir al próximo lunes de la siguiente semana\n      if (!_foundDayNextWeek) {\n        const baseDow = isoDow(baseDate);\n        const add = baseDow <= 1 ? 1 - baseDow : 8 - baseDow;\n        targetDate = addDaysISO(baseDate, add);\n      }\n    }\n  }\n  if (!targetDate && baseDate) {\n    if (normalizedText.includes(\"pasado manana\") || normalizedText.includes(\"pasadomanana\")) { targetDate = addDaysISO(baseDate, 2); }\n    else if (normalizedText.includes(\"hoy\")) { targetDate = baseDate; }\n    else { const isMorningPhrase = normalizedText.includes(\"en la manana\") || normalizedText.includes(\"por la manana\") || normalizedText.includes(\"matutino\"); if (normalizedText.includes(\"manana\") && !isMorningPhrase) { targetDate = addDaysISO(baseDate, 1); } }\n  }\n  if (!targetDate && baseDate) { for (const d of DAY_WORDS) { if (d.k.some(k => normalizedText.includes(k))) { targetDate = findNextWeekday(baseDate, d.dow); break; } } }\n  if (!targetDate && baseDate) { let next = addDaysISO(baseDate, 1); if (next && isoDow(next) === 0) next = addDaysISO(next, 1); targetDate = next || \"\"; }\n}\n\nif (!targetDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(targetDate)) {\n  return JSON.stringify({ ok: false, status: \"NEEDS_DATE\", needs_date: true, error: \"No se pudo resolver fecha\" });\n}\n\nif (isoDow(targetDate) === 0) {\n  const fb = nextFallbackDate(targetDate);\n  return JSON.stringify({ ok: false, status: \"CERRADO_DOMINGO\", needs_date: false, date: targetDate, label: labelEs(targetDate), fallbackDate: fb });\n}\n\nlet turn = safeString(payload.turn || \"\").toUpperCase();\nif (!turn) turn = detectTurn(text);\nif (turn === \"AMBIGUO\") turn = \"\";\n\nlet requestedTime = safeString(payload.requestedTime || \"\");\nif (!requestedTime) { const t = parseTimeFromText(text); if (t) requestedTime = t; }\n\nif (!turn && requestedTime) { const m = hmToMin(requestedTime); if (m !== null) { if (m >= 9 * 60 && m <= 13 * 60 + 30) turn = \"MANANA\"; else if (m >= 15 * 60 && m <= 16 * 60 + 30) turn = \"TARDE\"; } }\n\n// ======================================================\n// BÚSQUEDA DETERMINISTA DE LA FECHA DISPONIBLE\n// ======================================================\n//\n// Esta versión no obliga al agente a consultar un día, recibir un fallback\n// y volver a comenzar varias veces. La primera consulta al calendario abarca\n// hasta 28 días y esta misma tool encuentra la fecha correcta.\n//\n// Reglas:\n//\n// 1. Primera consulta del paciente:\n//    Si el día solicitado no está disponible, devuelve la PRIMERA fecha libre.\n//\n// 2. Elección posterior:\n//    Si ya se ofreció una fecha y el paciente dice \"mejor el jueves\",\n//    busca ese jueves a partir de la fecha previamente ofrecida.\n//\n// 3. Devuelve reply_text ya redactado para que el agente no improvise.\n\nconst SEARCH_DAYS = 28;\n\nconst _hasEventKeyBeforeParsing =\n  Object.prototype.hasOwnProperty.call(payload, \"events_busy\") ||\n  Object.prototype.hasOwnProperty.call(payload, \"events\") ||\n  Object.prototype.hasOwnProperty.call(payload, \"cal_events\");\n\nconst requestedDate = targetDate;\nconst queryAfterISO = buildISO(requestedDate, 0);\nconst searchEndDate = addDaysISO(requestedDate, SEARCH_DAYS);\nconst queryBeforeISO = searchEndDate\n  ? buildISO(searchEndDate, 0)\n  : buildISO(addDaysISO(requestedDate, 14), 0);\n\nif (!_hasEventKeyBeforeParsing) {\n  return JSON.stringify({\n    ok: true,\n    status: \"NEEDS_EVENTS\",\n    needs_events: true,\n    date: requestedDate,\n    requestedDate,\n    label: labelEs(requestedDate),\n    queryAfterISO,\n    queryBeforeISO,\n    searchDays: SEARCH_DAYS,\n    preserveRequestedWeekday,\n    fallbackMode: preserveRequestedWeekday\n      ? \"SAME_WEEKDAY_AFTER_PREVIOUS_OFFER\"\n      : \"EARLIEST_AVAILABLE\",\n    notBeforeDate,\n    instruction:\n      \"Consulta DISPONIBILIDAD_CALENDARIO una sola vez con queryAfterISO/queryBeforeISO y devuelve TODOS los eventos a SLOTS_ESP_DENTALES.\"\n  });\n}\n\nfunction looksLikeCalendarEvent(obj) {\n  if (!obj || !isObject(obj)) return false;\n\n  return !!(\n    obj.summary ||\n    obj.start?.dateTime ||\n    obj.start?.date ||\n    obj.end?.dateTime ||\n    obj.end?.date\n  );\n}\n\nfunction extractEventsFromAny(value, depth = 0) {\n  if (depth > 6 || value === undefined || value === null) return [];\n\n  const v = deepParse(value);\n\n  if (Array.isArray(v)) {\n    const flat = [];\n\n    for (const item of v) {\n      if (looksLikeCalendarEvent(item)) {\n        flat.push(item);\n      } else {\n        flat.push(...extractEventsFromAny(item, depth + 1));\n      }\n    }\n\n    return flat;\n  }\n\n  if (looksLikeCalendarEvent(v)) return [v];\n\n  if (isObject(v)) {\n    const candidateKeys = [\n      \"events_busy\",\n      \"events\",\n      \"cal_events\",\n      \"items\",\n      \"data\",\n      \"results\",\n      \"response\"\n    ];\n\n    for (const key of candidateKeys) {\n      if (key in v) {\n        const found = extractEventsFromAny(v[key], depth + 1);\n\n        if (found.length || Array.isArray(v[key])) {\n          return found;\n        }\n      }\n    }\n  }\n\n  return [];\n}\n\nconst rawEventCarrier = hasOwn(payload, \"events_busy\")\n  ? payload.events_busy\n  : hasOwn(payload, \"events\")\n    ? payload.events\n    : hasOwn(payload, \"cal_events\")\n      ? payload.cal_events\n      : [];\n\nconst events = extractEventsFromAny(rawEventCarrier).filter(ev => {\n  if (!looksLikeCalendarEvent(ev)) return false;\n  return safeLower(ev?.status) !== \"cancelled\";\n});\n\nfunction eventSummaryInfo(ev) {\n  const summary = normalizeText(ev?.summary || \"\");\n\n  const isMealBlock =\n    summary.includes(\"comida\") ||\n    summary.includes(\"hora de comida\") ||\n    summary.includes(\"almuerzo\");\n\n  const isNamedFullDayBlock =\n    summary.includes(\"bloqueo por ausencia\") ||\n    (\n      summary.includes(\"calendario bloqueado\") &&\n      !isMealBlock\n    );\n\n  return {\n    summary,\n    isMealBlock,\n    isNamedFullDayBlock\n  };\n}\n\n// Solo los eventos de DIA COMPLETO (all-day) bloquean la fecha entera.\n//\n// Un evento CON HORA nunca bloquea todo el dia, aunque su titulo diga\n// \"calendario bloqueado\". Se trata como ocupacion normal y solo bloquea\n// los slots de 30 min que realmente se traslapan con su horario.\n//\n// Motivo: los bloques recurrentes con hora (por ejemplo el de las 14:00)\n// estaban cancelando dias completos aunque cayeran fuera del horario de\n// atencion de ese dia.\nfunction eventBlocksWholeDate(ev, date) {\n  const isAllDay = !!(ev?.start?.date && ev?.end?.date);\n\n  if (!isAllDay) return false;\n\n  const startDate = safeString(ev.start.date).slice(0, 10);\n  const endDateExclusive = safeString(ev.end.date).slice(0, 10);\n\n  return isDateInAllDayRange(\n    date,\n    startDate,\n    endDateExclusive\n  );\n}\n\nfunction busyIntervalsForDate(date) {\n  const busy = [];\n\n  for (const ev of events) {\n    if (eventBlocksWholeDate(ev, date)) continue;\n    if (ev?.start?.date && ev?.end?.date) continue;\n\n    // Los bloques con hora (comida, bloqueos administrativos con horario)\n    // se tratan como ocupacion normal: solo tapan su propio intervalo.\n    const start = safeString(ev?.start?.dateTime);\n    const end = safeString(ev?.end?.dateTime);\n\n    if (!start || !end) continue;\n\n    const startDate = start.slice(0, 10);\n    const endDate = end.slice(0, 10);\n\n    if (date < startDate || date > endDate) continue;\n\n    const startMinRaw = hmToMin(start.slice(11, 16));\n    const endMinRaw = hmToMin(end.slice(11, 16));\n\n    if (startMinRaw === null || endMinRaw === null) continue;\n\n    let startMin = 0;\n    let endMin = 24 * 60;\n\n    if (startDate === date) startMin = startMinRaw;\n    if (endDate === date) endMin = endMinRaw;\n\n    // Evento normal del mismo día.\n    if (startDate === date && endDate === date) {\n      startMin = startMinRaw;\n      endMin = endMinRaw;\n    }\n\n    busy.push({\n      start: startMin,\n      end: endMin,\n      title: safeString(ev?.summary) || \"Evento\"\n    });\n  }\n\n  return busy;\n}\n\nfunction slotsForDate(date) {\n  if (events.some(ev => eventBlocksWholeDate(ev, date))) {\n    return {\n      date,\n      blockedWholeDay: true,\n      windows: [],\n      busy: [],\n      slots: []\n    };\n  }\n\n  let dateWindows = windowsForDate(date);\n\n  if (turn) {\n    dateWindows = dateWindows.filter(w => w.name === turn);\n  }\n\n  if (dateWindows.length === 0) {\n    return {\n      date,\n      blockedWholeDay: false,\n      windows: [],\n      busy: [],\n      slots: []\n    };\n  }\n\n  const busy = busyIntervalsForDate(date);\n  const generated = [];\n\n  const SLOT_MIN = 20;\n  const MAX_PARALLEL = 2;\n\n  for (const w of dateWindows) {\n    for (let t = w.start; t + SLOT_MIN <= w.end; t += SLOT_MIN) {\n      generated.push({\n        hm: minToHM(t),\n        startMin: t,\n        endMin: t + SLOT_MIN,\n        startTime: buildISO(date, t),\n        endTime: buildISO(date, t + SLOT_MIN),\n        turn: w.name\n      });\n    }\n  }\n\n  const freeSlots = generated.filter(slot => {\n    const overlapCount = busy.filter(interval =>\n      overlaps(slot.startMin, slot.endMin, interval.start, interval.end)\n    ).length;\n    return overlapCount < MAX_PARALLEL;\n  });\n\n  return {\n    date,\n    blockedWholeDay: false,\n    windows: dateWindows,\n    busy,\n    slots: freeSlots\n  };\n}\n\nfunction nextCandidateDate(date, offset) {\n  if (preserveRequestedWeekday && requestedWeekdayDow !== null) {\n    return addDaysISO(date, offset * 7);\n  }\n\n  return addDaysISO(date, offset);\n}\n\nlet searchStartDate = requestedDate;\n\n// Protección adicional:\n// en una respuesta posterior jamás volver a una fecha anterior\n// a la que ya fue ofrecida.\nif (\n  preserveRequestedWeekday &&\n  requestedWeekdayDow !== null &&\n  /^\\d{4}-\\d{2}-\\d{2}$/.test(notBeforeDate)\n) {\n  searchStartDate =\n    findNextWeekday(notBeforeDate, requestedWeekdayDow) ||\n    requestedDate;\n}\n\nconst maxCandidates =\n  preserveRequestedWeekday && requestedWeekdayDow !== null\n    ? 5\n    : SEARCH_DAYS;\n\nlet found = null;\nconst checkedDates = [];\n\nfor (let i = 0; i < maxCandidates; i++) {\n  const candidateDate = nextCandidateDate(searchStartDate, i);\n\n  if (!candidateDate) break;\n\n  checkedDates.push(candidateDate);\n\n  const result = slotsForDate(candidateDate);\n\n  if (result.slots.length > 0) {\n    found = result;\n    break;\n  }\n}\n\nif (!found) {\n  return JSON.stringify({\n    ok: false,\n    status: \"SIN_DISPONIBILIDAD_EN_RANGO\",\n    requestedDate,\n    requestedLabel: labelEs(requestedDate),\n    preserveRequestedWeekday,\n    notBeforeDate,\n    queryAfterISO,\n    queryBeforeISO,\n    checkedDates,\n    reply_text:\n      \"Por el momento no encontré horarios disponibles dentro de las próximas cuatro semanas. Permíteme canalizar tu solicitud con el equipo de recepción.\"\n  });\n}\n\nconst foundDate = found.date;\nconst shiftedDate = foundDate !== requestedDate;\nconst availableAll = found.slots.map(slot => slot.hm);\nconst slots_top = availableAll;\n\nfunction formatTime12(hm) {\n  const mins = hmToMin(hm);\n\n  if (mins === null) return hm;\n\n  let hour = Math.floor(mins / 60);\n  const minute = mins % 60;\n  const suffix = hour >= 12 ? \"p.m.\" : \"a.m.\";\n\n  hour = hour % 12;\n  if (hour === 0) hour = 12;\n\n  return `${hour}:${pad2(minute)} ${suffix}`;\n}\n\nfunction joinNatural(values) {\n  if (!values.length) return \"\";\n  if (values.length === 1) return values[0];\n  if (values.length === 2) return `${values[0]} y ${values[1]}`;\n\n  return `${values.slice(0, -1).join(\", \")} y ${values[values.length - 1]}`;\n}\n\nconst formattedSlots = joinNatural(\n  slots_top.map(formatTime12)\n);\n\nlet replyText = \"\";\n\nif (shiftedDate && preserveRequestedWeekday && requestedWeekdayName) {\n  replyText =\n    `Para el ${requestedWeekdayName}, la siguiente fecha disponible es el ` +\n    `${labelEs(foundDate)}. Para ese día tengo estos horarios: ` +\n    `${formattedSlots}. ¿Cuál te acomoda?`;\n} else if (shiftedDate) {\n  replyText =\n    `El Dr. Aldo Ríos volverá a tener citas disponibles a partir del ` +\n    `${labelEs(foundDate)}. Para ese día tengo estos horarios: ` +\n    `${formattedSlots}. ¿Cuál te acomoda?`;\n} else {\n  replyText =\n    `Para el ${labelEs(foundDate)} tengo estos horarios disponibles: ` +\n    `${formattedSlots}. ¿Cuál te acomoda?`;\n}\n\nlet validation = {\n  requestedTime: requestedTime || \"\",\n  is_free: false,\n  reason: requestedTime ? \"NO_DISPONIBLE\" : \"NO_REQUESTED_TIME\"\n};\n\nlet chosen = found.slots[0];\n\nif (requestedTime) {\n  const requestedMinutes = hmToMin(requestedTime);\n  const exact = found.slots.find(\n    slot => slot.startMin === requestedMinutes\n  );\n\n  if (exact) {\n    chosen = exact;\n    validation = {\n      requestedTime,\n      is_free: true,\n      reason: \"OK\"\n    };\n  }\n}\n\nreturn JSON.stringify({\n  ok: true,\n  status: \"OK\",\n  requestedDate,\n  requestedLabel: labelEs(requestedDate),\n  date: foundDate,\n  label: labelEs(foundDate),\n  dateShifted: shiftedDate,\n  preserveRequestedWeekday,\n  fallbackMode: preserveRequestedWeekday\n    ? \"SAME_WEEKDAY_AFTER_PREVIOUS_OFFER\"\n    : \"EARLIEST_AVAILABLE\",\n  notBeforeDate,\n  previousOfferDetected: previousBotOfferedAvailability,\n  followUpDayChoiceDetected: inferredFollowUpDayChoice,\n  queryAfterISO,\n  queryBeforeISO,\n  calendarEventsCount: events.length,\n  checkedDates,\n  windows: found.windows.map(w => ({\n    name: w.name,\n    start: minToHM(w.start),\n    end: minToHM(w.end)\n  })),\n  busyIntervals: found.busy.map(interval => ({\n    start: minToHM(interval.start),\n    end: interval.end >= 24 * 60\n      ? \"24:00\"\n      : minToHM(interval.end),\n    title: interval.title\n  })),\n  suggestion: {\n    hm: chosen.hm,\n    startTime: chosen.startTime,\n    endTime: chosen.endTime,\n    turn: chosen.turn\n  },\n  requested_slot_validation: validation,\n  slots_top,\n  availableAll,\n  reply_text: replyText\n});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\",\"description\":\"Mensaje del usuario\"},\"nowCdmxISO\":{\"type\":\"string\",\"description\":\"Fecha/hora CDMX, por ejemplo: 2026-03-04 18:41\"},\"events_busy\":{\"type\":\"array\",\"description\":\"Eventos ocupados del día\",\"items\":{\"type\":\"object\"}},\"date\":{\"type\":\"string\",\"description\":\"YYYY-MM-DD (opcional)\"},\"requestedTime\":{\"type\":\"string\",\"description\":\"HH:mm o vacío\",\"default\":\"\"},\"availability_checked\":{\"type\":\"boolean\",\"description\":\"true si ya se consultó disponibilidad\",\"default\":false},\"turn\":{\"type\":\"string\",\"description\":\"MANANA o TARDE (opcional, vacío para mostrar ambos turnos combinados)\",\"default\":\"\"}},\"required\":[\"input\",\"nowCdmxISO\"]}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        1856
+      ],
+      "id": "2fe6c91e-1c4e-4080-a112-24f46377320e",
+      "name": "SLOTS_INTEC"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "PENDIENTE_CALENDAR_ID_INTEC@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Universidad INTEC Colima"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        2064
+      ],
+      "id": "e333b272-df5d-4686-addc-927a03486449",
+      "name": "Cancelar Visita INTEC",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "XSs7bjZWIfqr54nn",
+          "name": "Google Calendar Esp. Dentales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "PENDIENTE_CALENDAR_ID_INTEC@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Universidad INTEC Colima"
+        },
+        "eventId": "={{ $fromAI(\"eventId\") }}",
+        "updateFields": {
+          "end": "={{ $fromAI('endTime') }}",
+          "start": "={{ $fromAI('startTime') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        2064
+      ],
+      "id": "6b452e3b-970f-46f7-af70-ffaf520f0418",
+      "name": "Reagendar Visita INTEC",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "XSs7bjZWIfqr54nn",
+          "name": "Google Calendar Esp. Dentales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Encuentra el eventId real de la valoración del paciente dentro de los eventos de Google Calendar usando scoring por manychatId, teléfono, startTime esperado y nombre.",
+        "jsCode": "// Code Tool — IDENTIFICAR_CITA — Especialidades Dentales\nfunction safeStr(v) { return (v === undefined || v === null) ? \"\" : String(v); }\nfunction norm(s) { return safeStr(s).trim().toLowerCase().normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\"); }\nfunction onlyDigits(s) { return safeStr(s).replace(/\\D/g, \"\"); }\nfunction last10Digits(phone) { const d = onlyDigits(phone); return d.length >= 10 ? d.slice(-10) : d; }\nfunction isObject(v) { return v !== null && typeof v === \"object\" && !Array.isArray(v); }\nfunction tryParseJSON(v) { if (typeof v !== \"string\") return v; const s = v.trim(); if (!s) return v; try { return JSON.parse(s); } catch (_) { return v; } }\nfunction deepParse(value, maxDepth = 6) { let current = value; for (let i = 0; i < maxDepth; i++) { const parsed = tryParseJSON(current); if (parsed === current) break; current = parsed; } return current; }\nfunction getDateFromEvent(ev) { const sdt = ev?.start?.dateTime; const sd = ev?.start?.date; if (sdt) return safeStr(sdt).slice(0, 10); if (sd) return safeStr(sd).slice(0, 10); return \"\"; }\nfunction getStartDT(ev) { return safeStr(ev?.start?.dateTime || \"\"); }\nfunction getEndDT(ev) { return safeStr(ev?.end?.dateTime || \"\"); }\nfunction isAllDay(ev) { return !!ev?.start?.date && !ev?.start?.dateTime; }\nfunction looksLikeBlock(summary) { const s = norm(summary); return s.includes(\"bloqueo\") || s.includes(\"bloqueado\") || s.includes(\"comida\") || s.includes(\"ausencia\") || s.includes(\"cerrado\") || s.includes(\"calendario bloqueado\"); }\nfunction looksLikeCalendarEvent(obj) { if (!obj || !isObject(obj)) return false; return !!(obj.summary || obj.start?.dateTime || obj.start?.date || obj.end?.dateTime || obj.end?.date); }\nfunction extractEventsFromAny(value, depth = 0) { if (depth > 6 || value === undefined || value === null) return []; const v = deepParse(value); if (Array.isArray(v)) { const flat = []; for (const item of v) { if (looksLikeCalendarEvent(item)) flat.push(item); else flat.push(...extractEventsFromAny(item, depth + 1)); } return flat; } if (looksLikeCalendarEvent(v)) return [v]; if (isObject(v)) { const keys = [\"events\",\"events_busy\",\"items\",\"data\",\"results\",\"response\"]; for (const key of keys) { if (key in v) { const found = extractEventsFromAny(v[key], depth + 1); if (found.length || Array.isArray(v[key])) return found; } } } return []; }\nfunction scoreEvent(ev, ctx) {\n  const summary = norm(ev?.summary || \"\"); const desc = norm(ev?.description || \"\"); const eventId = safeStr(ev?.id || \"\");\n  if (isAllDay(ev)) return { score: -9999, reason: \"all_day\" };\n  if (looksLikeBlock(summary)) return { score: -9999, reason: \"block\" };\n  let score = 0; const reasons = [];\n  if (summary.includes(\"valoracion\") || summary.includes(\"dental\")) { score += 20; reasons.push(\"summary_valoracion\"); }\n  if (ctx.manychatId && desc.includes(norm(ctx.manychatId))) { score += 120; reasons.push(\"desc_manychatId\"); }\n  if (ctx.phone10 && ctx.phone10.length >= 8 && desc.includes(ctx.phone10)) { score += 80; reasons.push(\"desc_phone10\"); }\n  if (ctx.expectedStartTime) { const evStart = getStartDT(ev); if (evStart) { if (evStart === ctx.expectedStartTime) { score += 100; reasons.push(\"start_exact\"); } else if (evStart.slice(0,16) === ctx.expectedStartTime.slice(0,16)) { score += 70; reasons.push(\"start_same_minute\"); } } }\n  if (ctx.nameTokens.length) { let hits = 0; for (const t of ctx.nameTokens) { if (t.length < 3) continue; if (summary.includes(t) || desc.includes(t)) hits++; } if (hits > 0) { score += Math.min(40, hits * 10); reasons.push(`name_hits_${hits}`); } }\n  if (eventId) score += 1;\n  return { score, reason: reasons.join(\"|\") || \"weak_match\" };\n}\nlet payload = {};\ntry { if (typeof input === \"object\" && input) payload = { ...input }; else if (typeof input === \"string\" && input.trim()) { const p = deepParse(input); if (isObject(p)) payload = { ...p }; else payload = { input: String(input) }; } } catch(_) {}\ntry { if (typeof query === \"object\" && query) payload = { ...query, ...payload }; else if (typeof query === \"string\" && query.trim()) { const p = deepParse(query); if (isObject(p)) payload = { ...p, ...payload }; } } catch(_) {}\ntry { if (payload && typeof payload.query === \"string\" && payload.query.trim()) { const q = deepParse(payload.query); if (isObject(q)) payload = { ...payload, ...q }; } else if (payload && isObject(payload.query)) { payload = { ...payload, ...payload.query }; } } catch(_) {}\ntry { if (typeof $json === \"object\" && $json) payload = { ...$json, ...payload }; } catch(_) {}\nconst inDate = safeStr(payload.date).trim();\nconst inManychatId = safeStr(payload.manychatId).trim();\nconst inUserphone = safeStr(payload.userphone).trim();\nconst inUserName = safeStr(payload.userName).trim();\nconst inExpectedStartTime = safeStr(payload.expectedStartTime).trim();\nconst rawEventCarrier = payload.events !== undefined ? payload.events : payload.events_busy !== undefined ? payload.events_busy : payload.items !== undefined ? payload.items : payload.data !== undefined ? payload.data : null;\nconst eventsRaw = extractEventsFromAny(rawEventCarrier);\nconst inEvents = eventsRaw.filter(ev => ev && (ev.summary || ev.start?.dateTime || ev.start?.date));\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(inDate)) { return JSON.stringify({ ok: false, status: \"ERROR\", error: \"date inválida — se esperaba YYYY-MM-DD\" }); }\nif (!inManychatId && !inUserphone) { return JSON.stringify({ ok: false, status: \"ERROR\", error: \"Falta manychatId o userphone\" }); }\nif (!inEvents.length) { return JSON.stringify({ ok: false, status: \"NO_EVENTS\", date: inDate, error: \"DISPONIBILIDAD_CALENDARIO no devolvió eventos para ese día.\", hint: \"Verifica que el rango After/Before cubra el día completo en CDMX.\" }); }\nconst ctx = { manychatId: inManychatId, phone10: last10Digits(inUserphone), expectedStartTime: inExpectedStartTime, nameTokens: norm(inUserName).split(/\\s+/).filter(Boolean) };\nconst dayEvents = inEvents.filter(ev => getDateFromEvent(ev) === inDate);\nconst pool = dayEvents.length ? dayEvents : inEvents;\nconst scored = pool.map(ev => { const s = scoreEvent(ev, ctx); return { id: safeStr(ev?.id || \"\"), summary: safeStr(ev?.summary || \"\"), startTime: getStartDT(ev), endTime: getEndDT(ev), score: s.score, matchedBy: s.reason }; }).sort((a, b) => b.score - a.score);\nconst best = scored[0];\nconst hasStrongSignal = !!(inManychatId || (inUserphone && last10Digits(inUserphone).length >= 8));\nconst THRESHOLD = hasStrongSignal ? 40 : 30;\nif (!best || best.score < THRESHOLD) { return JSON.stringify({ ok: false, status: \"NO_MATCH\", date: inDate, error: \"No pude identificar la valoración con suficiente certeza.\", hint: \"Asegúrate de que la descripción del evento en Calendar incluya el manychatId y teléfono del paciente.\", debug: { threshold: THRESHOLD, candidatesTop5: scored.slice(0, 5) } }); }\nreturn JSON.stringify({ ok: true, status: \"FOUND\", date: inDate, eventId: best.id, startTime: best.startTime, endTime: best.endTime, matchedBy: best.matchedBy, debug: { threshold: THRESHOLD, candidatesTop5: scored.slice(0, 5) } });\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"date\":{\"type\":\"string\",\"pattern\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}$\",\"description\":\"Fecha objetivo ISO (YYYY-MM-DD) en CDMX\"},\"manychatId\":{\"type\":\"string\"},\"userphone\":{\"type\":\"string\"},\"userName\":{\"type\":\"string\"},\"expectedStartTime\":{\"type\":\"string\",\"description\":\"Opcional: startTime ISO esperado (si lo sacaste de Sheets)\"},\"events\":{\"type\":\"array\",\"description\":\"Lista completa devuelta por Disponibilidad1\",\"items\":{\"type\":\"object\"}}},\"required\":[\"date\",\"manychatId\",\"userphone\",\"events\"]}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        2064
+      ],
+      "id": "4093aa4d-0170-44d0-bc93-b9a25207ac0e",
+      "name": "Identificar Visita INTEC"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, reply: $json.reply || $json.final_text || $json.output || \"Sin respuesta del bot.\", final_text: $json.final_text || $json.reply || $json.output || \"\", chat_id: $json.chat_id, session_key: $json.session_key } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        1120
+      ],
+      "id": "resp-prueba-intec-001",
+      "name": "Responder prueba INTEC"
+    }
+  ],
+  "connections": {
+    "Webhook prueba INTEC": {
+      "main": [
+        {
+          "index": 0,
+          "type": "main",
+          "node": "Extraer Datos"
+        }
+      ]
+    },
+    "Extraer Datos": {
+      "main": [
+        {
+          "index": 0,
+          "type": "main",
+          "node": "IF Evento Valido"
+        }
+      ]
+    },
+    "IF Evento Valido": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "type": "main",
+            "node": "IF Es Media"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "type": "main",
+            "node": "Responder prueba INTEC"
+          }
+        ]
+      ]
+    },
+    "IF Es Media": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "type": "main",
+            "node": "Respuesta Media"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "type": "main",
+            "node": "Agente INTEC"
+          }
+        ]
+      ]
+    },
+    "Respuesta Media": {
+      "main": [
+        {
+          "index": 0,
+          "type": "main",
+          "node": "Responder prueba INTEC"
+        }
+      ]
+    },
+    "Agente INTEC": {
+      "main": [
+        {
+          "index": 0,
+          "type": "main",
+          "node": "Parser y Guardarraíl"
+        }
+      ]
+    },
+    "Parser y Guardarraíl": {
+      "main": [
+        {
+          "index": 0,
+          "type": "main",
+          "node": "Responder prueba INTEC"
+        }
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        {
+          "index": 0,
+          "type": "ai_languageModel",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Memoria Postgres": {
+      "ai_memory": [
+        {
+          "index": 0,
+          "type": "ai_memory",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Disponibilidad INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Agendar Visita INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "SLOTS_INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Cancelar Visita INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Reagendar Visita INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    },
+    "Identificar Visita INTEC": {
+      "ai_tool": [
+        {
+          "index": 0,
+          "type": "ai_tool",
+          "node": "Agente INTEC"
+        }
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "211e2c14e90323b3e38e0a830e3a51168e3db8e2f58e0eecc0ae0650a3bdb773"
+  }
+}
