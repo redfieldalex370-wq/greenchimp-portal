@@ -44,7 +44,7 @@ const schema = z.object({
   WHATSAPP_GRAPH_VERSION: z.string().default('v23.0'),
   DEFAULT_PHONE_NUMBER_ID: z.string().default('1240006745865858'),
   DENTAL_PHONE_NUMBER_ID: z.string().default('620774694457849'),
-  ZENDA_PHONE_NUMBER_ID: z.string().default('1294128530441152'),
+  ZENDA_PHONE_NUMBER_ID: z.string().default('1272209879317604'),
   MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default(''),
   TEST_PHONE_NUMBER_ID: z.string().default(''),
   TEST_BOT_LABEL: z.string().default('Pruebas bot'),
