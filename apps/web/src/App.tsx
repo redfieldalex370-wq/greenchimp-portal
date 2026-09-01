@@ -29,7 +29,8 @@ function newTestChatId() {
 
 const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1240006745865858', name: 'Green Chimp', number: '521 414 104 7421', initials: 'GC' },
-  { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' }
+  { id: '620774694457849', name: 'Especialidades dentales', number: '427 117 6618', initials: 'ED' },
+  { id: '1294128530441152', name: 'Zenda Café', number: 'WhatsApp Zenda', initials: 'ZC' }
 ];
 
 const DEFAULT_TEST_BOT_CONFIG: TestBotConfig = {
