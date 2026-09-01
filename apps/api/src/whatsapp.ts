@@ -8,7 +8,9 @@ function accessTokenFor(phoneNumberId: string) {
       ? config.WHATSAPP_DENTAL_ACCESS_TOKEN
       : phoneNumberId === config.ZENDA_PHONE_NUMBER_ID
         ? config.WHATSAPP_ZENDA_ACCESS_TOKEN
-        : config.WHATSAPP_ACCESS_TOKEN;
+        : phoneNumberId === config.WOOLRICH_PHONE_NUMBER_ID
+          ? config.WHATSAPP_WOOLRICH_ACCESS_TOKEN
+          : config.WHATSAPP_ACCESS_TOKEN;
   if (!token) throw Object.assign(new Error('Falta configurar el token de WhatsApp Cloud API.'), { status: 503 });
   return token;
 }
