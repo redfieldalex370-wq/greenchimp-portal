@@ -51,6 +51,7 @@ export default function App() {
   const [testBotConfig, setTestBotConfig] = useState<TestBotConfig>(DEFAULT_TEST_BOT_CONFIG);
   const [user, setUser] = useState<PortalUser | null>(null);
   const [activeAccountId, setActiveAccountId] = useState<string>(IS_PUBLIC_TEST_ROUTE ? '' : BASE_PORTAL_ACCOUNTS[0].id);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [booting, setBooting] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -491,20 +492,32 @@ export default function App() {
           <div className="brand-mark">GC</div>
           <div><strong>Green Chimp</strong><span>Portal de conversaciones</span></div>
         </div>
-        <nav className="account-switcher" aria-label="Cuentas de WhatsApp">
-          {portalAccounts.map((account) => (
-            <button
-              key={account.id}
-              className={account.id === activeAccountId ? 'is-active' : ''}
-              onClick={() => selectAccount(account.id)}
-              aria-pressed={account.id === activeAccountId}
-              title={`${account.name} · ${account.number}`}
-            >
-              <span>{account.initials}</span>
-              <span><strong>{account.name}</strong><small>{account.number}</small></span>
-            </button>
-          ))}
-        </nav>
+        <div className="account-switcher account-switcher-dropdown">
+          <button
+            className="account-switcher-dropdown__trigger is-active"
+            onClick={() => setAccountMenuOpen((open) => !open)}
+            aria-expanded={accountMenuOpen}
+            aria-haspopup="menu"
+          >
+            <span>{portalAccounts.find((account) => account.id === activeAccountId)?.initials || 'GC'}</span>
+            <span><strong>{portalAccounts.find((account) => account.id === activeAccountId)?.name || 'Seleccionar cuenta'}</strong><small>Seleccionar cuenta ▾</small></span>
+          </button>
+          {accountMenuOpen && (
+            <div className="account-switcher-dropdown__menu" role="menu">
+              {portalAccounts.map((account) => (
+                <button
+                  key={account.id}
+                  className={account.id === activeAccountId ? 'is-active' : ''}
+                  onClick={() => { selectAccount(account.id); setAccountMenuOpen(false); }}
+                  role="menuitem"
+                >
+                  <span>{account.initials}</span>
+                  <span><strong>{account.name}</strong><small>{account.number}</small></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="topbar-user">
           {testAccount && <span className="test-mode-label">Webhook de pruebas activo</span>}
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
