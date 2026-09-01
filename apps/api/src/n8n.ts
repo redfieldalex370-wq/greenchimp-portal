@@ -36,7 +36,11 @@ export function sendManualMessage(input: {
         ? config.N8N_ZENDA_SEND_URL
         : input.phoneNumberId === config.WOOLRICH_PHONE_NUMBER_ID
           ? config.N8N_WOOLRICH_SEND_URL
-          : config.N8N_SEND_URL;
+          : input.phoneNumberId === config.MUNDO_CREATIVO_PHONE_NUMBER_ID
+            ? config.N8N_MUNDO_CREATIVO_SEND_URL
+            : input.phoneNumberId === config.INTEC_PHONE_NUMBER_ID
+              ? config.N8N_INTEC_SEND_URL
+              : config.N8N_SEND_URL;
   return callN8n(url || undefined, {
     phone_number_id: input.phoneNumberId,
     wa_id: input.waId,
