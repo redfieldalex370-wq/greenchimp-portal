@@ -21,8 +21,14 @@ import {
 } from './repository.js';
 import { sendManualMessage } from './n8n.js';
 import { normalizeUploadMimeType, sendWhatsAppMedia, uploadWhatsAppMedia } from './whatsapp.js';
+import { databaseContext } from './db.js';
 
 const app = express();
+app.use(express.json({ limit: '2mb' }));
+app.use((req, _res, next) => {
+  const id = String(req.query.phone_number_id || req.body?.phone_number_id || '');
+  databaseContext.run(id === config.INTEC_PHONE_NUMBER_ID ? 'intec' : 'main', next);
+});
 const conversationParamsSchema = z.object({
   phoneNumberId: z.string().min(1),
   waId: z.string().min(1)

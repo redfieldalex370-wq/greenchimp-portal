@@ -28,6 +28,7 @@ const schema = z.object({
   DEMO_ADMIN_USER: z.string().default('admin'),
   DEMO_ADMIN_PASSWORD: z.string().default('cambia-esta-clave'),
   DATABASE_URL: z.string().optional(),
+  INTEC_DATABASE_URL: z.string().optional(),
   PGSSL: booleanFromString,
   N8N_SEND_URL: z.string().url().optional().or(z.literal('')),
   N8N_DENTAL_SEND_URL: z.string().url().optional().or(z.literal('')),

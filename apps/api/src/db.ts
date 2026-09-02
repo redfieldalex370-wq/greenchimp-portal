@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { config } from './config.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const { Pool } = pg;
 
@@ -13,21 +14,27 @@ export const pool = config.DEMO_MODE
       connectionTimeoutMillis: 10_000
     });
 
+export const intecPool = config.DEMO_MODE || !config.INTEC_DATABASE_URL ? null : new Pool({ connectionString: config.INTEC_DATABASE_URL, ssl: config.PGSSL ? { rejectUnauthorized: false } : undefined, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000 });
+export const databaseContext = new AsyncLocalStorage<'main' | 'intec'>();
+export function activePool() { return databaseContext.getStore() === 'intec' ? intecPool : pool; }
+
 export async function query<T extends pg.QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
-  if (!pool) {
-    throw new Error('La base de datos no está disponible en modo demostración.');
+  const selectedPool = activePool();
+  if (!selectedPool) {
+    throw new Error('La base de datos no estï¿½ disponible en modo demostraciï¿½n.');
   }
 
-  const result = await pool.query<T>(text, values);
+  const result = await selectedPool.query<T>(text, values);
   return result.rows;
 }
 
 export async function withTransaction<T>(callback: (client: pg.PoolClient) => Promise<T>): Promise<T> {
-  if (!pool) {
-    throw new Error('La base de datos no está disponible en modo demostración.');
+  const selectedPool = activePool();
+  if (!selectedPool) {
+    throw new Error('La base de datos no estï¿½ disponible en modo demostraciï¿½n.');
   }
 
-  const client = await pool.connect();
+  const client = await selectedPool.connect();
   try {
     await client.query('BEGIN');
     const result = await callback(client);
@@ -40,3 +47,4 @@ export async function withTransaction<T>(callback: (client: pg.PoolClient) => Pr
     client.release();
   }
 }
+
