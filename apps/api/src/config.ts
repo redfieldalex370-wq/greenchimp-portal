@@ -54,7 +54,7 @@ const schema = z.object({
   ZENDA_PHONE_NUMBER_ID: z.string().default('1272209879317604'),
   WOOLRICH_PHONE_NUMBER_ID: z.string().default('1289334717595109'),
   MUNDO_CREATIVO_PHONE_NUMBER_ID: z.string().default('1282163304983034'),
-  INTEC_PHONE_NUMBER_ID: z.string().default('4352478081673821'),
+  INTEC_PHONE_NUMBER_ID: z.string().default('1252826821253792'),
   MUNDO_AVENTURERO_PHONE_NUMBER_ID: z.string().default(''),
   TEST_PHONE_NUMBER_ID: z.string().default(''),
   TEST_BOT_LABEL: z.string().default('Pruebas bot'),

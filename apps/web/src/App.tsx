@@ -33,7 +33,7 @@ const BASE_PORTAL_ACCOUNTS: PortalAccount[] = [
   { id: '1272209879317604', name: 'Zenda Café', number: 'WhatsApp Zenda', initials: 'ZC' },
   { id: '1289334717595109', name: 'Dr. Woolrich', number: 'WhatsApp Dr. Woolrich', initials: 'DW' }
   ,{ id: '1282163304983034', name: 'Mundo Creativo', number: 'WhatsApp Mundo Creativo', initials: 'MC' }
-  ,{ id: '4352478081673821', name: 'INTEC', number: 'WhatsApp INTEC', initials: 'IN' }
+  ,{ id: '1252826821253792', name: 'INTEC', number: 'WhatsApp INTEC', initials: 'IN' }
 ];
 
 const DEFAULT_TEST_BOT_CONFIG: TestBotConfig = {
