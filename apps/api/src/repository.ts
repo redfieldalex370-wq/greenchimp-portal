@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { pool, query, withTransaction } from './db.js';
+import { activePool, pool, query, withTransaction } from './db.js';
 import { deleteDemoConversation, demoKey, demoMessages, getDemoConversations, updateDemoConversation } from './demo-data.js';
 import type { Conversation, Message } from './types.js';
 
@@ -309,7 +309,10 @@ export async function listMessages(phoneNumberId: string, waId: string, usuarioI
   if (config.DEMO_MODE) return demoMessages.get(demoKey(phoneNumberId, waId)) ?? [];
 
   const usuarioIdTrimmed = usuarioId?.trim() || '';
-  const hasUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
+  // Detect optional columns on the database selected for this request.
+  // INTEC has its own schema and may not include usuario_id.
+  const selectedPool = activePool();
+  const hasUsuarioId = selectedPool ? await columnExists(selectedPool, 'wa_mensajes', 'usuario_id') : false;
 
   if (hasUsuarioId) {
     return query<Message>(
