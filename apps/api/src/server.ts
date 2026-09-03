@@ -26,7 +26,10 @@ import { databaseContext } from './db.js';
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use((req, _res, next) => {
-  const id = String(req.query.phone_number_id || req.body?.phone_number_id || '');
+  // Message/conversation routes are prefixed with /api; accept either form
+  // so requests for an INTEC chat use the INTEC database connection.
+  const pathPhoneId = req.path.match(/\/conversations\/([^/]+)/)?.[1] || '';
+  const id = String(req.query.phone_number_id || req.body?.phone_number_id || pathPhoneId || '');
   databaseContext.run(id === config.INTEC_PHONE_NUMBER_ID ? 'intec' : 'main', next);
 });
 const conversationParamsSchema = z.object({
