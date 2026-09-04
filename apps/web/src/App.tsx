@@ -158,6 +158,10 @@ export default function App() {
   }, [selected]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [selectedKey]);
+
+  useEffect(() => {
     if (!portalAccounts.some((account) => account.id === activeAccountId)) {
       setActiveAccountId(IS_PUBLIC_TEST_ROUTE
         ? (testAccount?.id ?? '')

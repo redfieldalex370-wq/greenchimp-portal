@@ -178,7 +178,7 @@ export function MessageThread({
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [recording, setRecording] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messageScrollRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const stickerInputRef = useRef<HTMLInputElement>(null);
@@ -189,7 +189,9 @@ export function MessageThread({
   const canRecordAudio = Boolean(audioMimeType) && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const messageScroll = messageScrollRef.current;
+    if (!messageScroll) return;
+    messageScroll.scrollTo({ top: messageScroll.scrollHeight, behavior: 'smooth' });
   }, [messages.length, conversation?.wa_id]);
 
   useEffect(() => {
@@ -386,7 +388,7 @@ export function MessageThread({
         </div>
       </header>
 
-      <div className="message-scroll">
+      <div className="message-scroll" ref={messageScrollRef}>
         {safeMessages.map((message) => {
           const mediaType = message.tipo.toLowerCase();
           return (
@@ -413,7 +415,6 @@ export function MessageThread({
 
         {loading && safeMessages.length === 0 && <div className="empty-thread">Cargando historial...</div>}
         {!loading && safeMessages.length === 0 && <div className="empty-thread">Todavia no hay mensajes guardados.</div>}
-        <div ref={bottomRef} />
       </div>
 
       <form className={`composer ${pendingAttachment ? 'composer--with-attachment' : ''}`} onSubmit={submit}>
