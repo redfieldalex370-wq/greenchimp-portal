@@ -22,6 +22,7 @@ type TestBotConfig = {
 
 const TEST_CHAT_PREFIX = 'portal-test-chat';
 const IS_PUBLIC_TEST_ROUTE = window.location.pathname === '/';
+const IS_INTEC_ROUTE = window.location.pathname === '/intec';
 
 function newTestChatId() {
   return `${TEST_CHAT_PREFIX}-${crypto.randomUUID()}`;
@@ -85,7 +86,9 @@ export default function App() {
   }, [testBotConfig]);
 
   const portalAccounts = useMemo(
-    () => IS_PUBLIC_TEST_ROUTE
+    () => IS_INTEC_ROUTE
+      ? BASE_PORTAL_ACCOUNTS.filter((account) => account.id === '1252826821253792')
+      : IS_PUBLIC_TEST_ROUTE
       ? (testAccount ? [testAccount] : [])
       : [...BASE_PORTAL_ACCOUNTS, ...(testAccount ? [testAccount] : [])],
     [testAccount]

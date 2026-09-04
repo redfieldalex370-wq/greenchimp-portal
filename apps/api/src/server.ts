@@ -199,7 +199,9 @@ app.get('/api/auth/me', async (req, res, next) => {
 app.get('/api/conversations', requireAuth, async (req, res, next) => {
   try {
     const search = typeof req.query.search === 'string' ? req.query.search : '';
-    const phoneNumberId = typeof req.query.phone_number_id === 'string' ? req.query.phone_number_id : '';
+    const scoped = res.locals.user?.accountScope as string | null | undefined;
+    const requested = typeof req.query.phone_number_id === 'string' ? req.query.phone_number_id : '';
+    const phoneNumberId = scoped || requested;
     res.json({ ok: true, conversations: await listConversations(search, phoneNumberId) });
   } catch (error) {
     next(error);
@@ -555,6 +557,7 @@ if (config.NODE_ENV === 'production' && fs.existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get('/', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
   app.get('/b/DSfRvuk-y5-A8', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+  app.get('/intec', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
 }
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

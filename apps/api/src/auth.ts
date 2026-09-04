@@ -32,7 +32,7 @@ export async function validateCredentials(username: string, password: string): P
     if (!safeEqual(username, config.DEMO_ADMIN_USER) || !safeEqual(password, config.DEMO_ADMIN_PASSWORD)) {
       return null;
     }
-    return { id: 'demo-1', username, name: 'Administrador Green Chimp', email: null };
+    return { id: 'demo-1', username, name: 'Administrador Green Chimp', email: null, accountScope: null };
   }
 
   const rows = await query<{
@@ -41,8 +41,9 @@ export async function validateCredentials(username: string, password: string): P
     email: string | null;
     nombre: string;
     password_hash: string;
+    account_scope: string | null;
   }>(
-    `SELECT id::text, usuario, email, nombre, password_hash
+    `SELECT id::text, usuario, email, nombre, password_hash, account_scope
        FROM public.portal_usuarios
       WHERE activo = TRUE
         AND (LOWER(usuario) = LOWER($1) OR LOWER(COALESCE(email, '')) = LOWER($1))
@@ -53,7 +54,7 @@ export async function validateCredentials(username: string, password: string): P
   const row = rows[0];
   if (!row || !(await bcrypt.compare(password, row.password_hash))) return null;
 
-  return { id: row.id, username: row.usuario, name: row.nombre, email: row.email };
+  return { id: row.id, username: row.usuario, name: row.nombre, email: row.email, accountScope: row.account_scope };
 }
 
 export async function createSession(req: Request, res: Response, user: PortalUser) {
@@ -116,8 +117,9 @@ export async function getSessionUser(req: Request): Promise<PortalUser | null> {
     usuario: string;
     nombre: string;
     email: string | null;
+    account_scope: string | null;
   }>(
-    `SELECT u.id::text, u.usuario, u.nombre, u.email
+    `SELECT u.id::text, u.usuario, u.nombre, u.email, u.account_scope
        FROM public.portal_sesiones s
        JOIN public.portal_usuarios u ON u.id = s.usuario_id
       WHERE s.token_hash = $1
@@ -135,7 +137,7 @@ export async function getSessionUser(req: Request): Promise<PortalUser | null> {
     [hashToken(token)]
   ).catch(() => undefined);
 
-  return { id: row.id, username: row.usuario, name: row.nombre, email: row.email };
+  return { id: row.id, username: row.usuario, name: row.nombre, email: row.email, accountScope: row.account_scope };
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
