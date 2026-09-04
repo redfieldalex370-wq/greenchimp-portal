@@ -333,8 +333,8 @@ button { color: inherit; }
 
 @media (max-width: 760px) {
   body { overflow: hidden; }
-  .app-shell { height: 100vh; height: 100dvh; overflow: hidden; }
-  .topbar { height: 60px; padding: 0 10px; gap: 7px; }
+  .app-shell { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  .topbar { position: sticky; top: 0; z-index: 9; flex: 0 0 60px; width: 100%; height: 60px; padding: 0 10px; gap: 7px; }
   .topbar-brand { gap: 7px; }
   .topbar-brand > div:last-child { display: none; }
   .topbar-user { gap: 6px; }
@@ -342,7 +342,7 @@ button { color: inherit; }
   .topbar-brand span, .topbar-user > div { display: none; }
   .account-switcher { margin-left: auto; margin-right: 0; }
   .account-switcher-dropdown__menu { position: fixed; top: 64px; left: 10px; right: 10px; width: auto; min-width: 0; max-height: calc(100dvh - 78px); overflow-y: auto; }
-  .workspace { display: block; height: calc(100vh - 60px); height: calc(100dvh - 60px); min-height: 0; border: 0; }
+  .workspace { display: block; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; border: 0; }
   .conversation-column, .thread-column { width: 100%; height: 100%; }
   .conversation-column { border-right: 0; border-bottom: 0; }
   .workspace:not(.workspace--thread-open) .thread-column { display: none; }
