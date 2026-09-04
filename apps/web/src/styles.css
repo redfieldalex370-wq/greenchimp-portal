@@ -211,7 +211,8 @@ button { color: inherit; }
 
 .thread-header { min-height: 76px; padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .thread-header__identity { min-width: 0; flex: 1; }
-.mobile-back-button { display: none; }
+.thread-header__actions { display: flex; align-items: center; gap: 8px; }
+.mobile-back-button, .mobile-contact-button, .mobile-contact-close { display: none; }
 .thread-header h2 { margin: 0; font-size: 16px; }
 .thread-header p { color: var(--muted); font-size: 11px; margin: 5px 0 0; }
 .window-chip { white-space: nowrap; font-size: 11px; color: #b8c4bc; background: #19211c; border: 1px solid #2a352e; padding: 7px 10px; border-radius: 999px; }
@@ -347,9 +348,21 @@ button { color: inherit; }
   .conversation-column { border-right: 0; border-bottom: 0; }
   .workspace:not(.workspace--thread-open) .thread-column { display: none; }
   .workspace.workspace--thread-open .conversation-column { display: none; }
+  .workspace.workspace--thread-open.workspace--contact-open .thread-column { display: none; }
+  .workspace.workspace--thread-open.workspace--contact-open .contact-column { display: block; width: 100%; height: 100%; border: 0; padding: 0 16px max(20px, env(safe-area-inset-bottom)); }
   .thread-header { min-height: 64px; padding: 10px 12px; gap: 9px; }
   .mobile-back-button { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 12px; background: #18201b; color: var(--lime); font-size: 30px; line-height: 1; cursor: pointer; }
+  .mobile-contact-button, .mobile-contact-close { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 12px; background: #18201b; color: var(--lime); font-size: 24px; line-height: 1; cursor: pointer; }
+  .mobile-contact-close { font-size: 25px; }
   .thread-header__identity h2, .thread-header__identity p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .thread-header__actions { gap: 6px; }
+  .workspace--contact-open .contact-column .column-heading { padding: 16px 0 12px; }
+  .workspace--contact-open .contact-identity { padding-top: 6px; }
+  .workspace--contact-open .bot-card { margin-top: 20px; }
+  .workspace--contact-open .switch { width: 50px; height: 30px; padding: 4px; }
+  .workspace--contact-open .switch span { width: 22px; height: 22px; }
+  .workspace--contact-open .switch.is-on span { transform: translateX(20px); }
+  .workspace--contact-open .delete-conversation { min-height: 46px; font-size: 12px; }
   .window-chip { font-size: 9px; }
   .column-heading { padding: 17px 16px 12px; }
   .search-box { margin-inline: 10px; }

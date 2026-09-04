@@ -159,7 +159,8 @@ export function MessageThread({
   onSendMedia,
   onSendMediaById,
   onError,
-  onBack
+  onBack,
+  onOpenContact
 }: {
   conversation: Conversation | null;
   messages: Message[];
@@ -170,6 +171,7 @@ export function MessageThread({
   onSendMediaById: (type: string, mediaId: string, caption: string) => Promise<void>;
   onError: (message: string) => void;
   onBack?: () => void;
+  onOpenContact?: () => void;
 }) {
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
@@ -374,9 +376,14 @@ export function MessageThread({
           <h2>{conversation.nombre}</h2>
           <p>{conversation.wa_id}</p>
         </div>
-        <span className={`window-chip ${conversation.ventana_abierta ? '' : 'window-chip--closed'}`}>
-          {windowCountdown(conversation.ventana_expira)}
-        </span>
+        <div className="thread-header__actions">
+          <span className={`window-chip ${conversation.ventana_abierta ? '' : 'window-chip--closed'}`}>
+            {windowCountdown(conversation.ventana_expira)}
+          </span>
+          <button type="button" className="mobile-contact-button" onClick={onOpenContact} aria-label="Abrir opciones del contacto">
+            ⋮
+          </button>
+        </div>
       </header>
 
       <div className="message-scroll">

@@ -79,6 +79,7 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [updatingBot, setUpdatingBot] = useState(false);
   const [deletingConversation, setDeletingConversation] = useState(false);
+  const [mobileContactOpen, setMobileContactOpen] = useState(false);
   const [toast, setToast] = useState('');
   const knownConversationKeys = useRef<Set<string> | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
@@ -151,6 +152,10 @@ export default function App() {
     () => displayedConversations.find((item) => conversationKey(item) === selectedKey) ?? null,
     [displayedConversations, selectedKey]
   );
+
+  useEffect(() => {
+    if (!selected) setMobileContactOpen(false);
+  }, [selected]);
 
   useEffect(() => {
     if (!portalAccounts.some((account) => account.id === activeAccountId)) {
@@ -536,13 +541,16 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`workspace ${selected ? 'workspace--thread-open' : ''}`}>
+      <main className={`workspace ${selected ? 'workspace--thread-open' : ''} ${mobileContactOpen ? 'workspace--contact-open' : ''}`}>
         <ConversationList
           conversations={displayedConversations}
           selected={selected}
           search={search}
           onSearch={setSearch}
-          onSelect={(conversation) => setSelectedKey(conversationKey(conversation))}
+          onSelect={(conversation) => {
+            setMobileContactOpen(false);
+            setSelectedKey(conversationKey(conversation));
+          }}
           loading={loadingConversations}
         />
         <MessageThread
@@ -554,7 +562,11 @@ export default function App() {
           onSendMedia={sendMedia}
           onSendMediaById={sendMediaById}
           onError={showToast}
-          onBack={() => setSelectedKey(null)}
+          onBack={() => {
+            setMobileContactOpen(false);
+            setSelectedKey(null);
+          }}
+          onOpenContact={() => setMobileContactOpen(true)}
         />
         <ContactPanel
           conversation={selected}
@@ -562,6 +574,7 @@ export default function App() {
           deleting={deletingConversation}
           onToggleBot={toggleBot}
           onDelete={removeConversation}
+          onClose={() => setMobileContactOpen(false)}
         />
       </main>
 

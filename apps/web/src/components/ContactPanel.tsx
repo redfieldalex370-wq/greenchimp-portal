@@ -6,13 +6,15 @@ export function ContactPanel({
   updatingBot,
   deleting,
   onToggleBot,
-  onDelete
+  onDelete,
+  onClose
 }: {
   conversation: Conversation | null;
   updatingBot: boolean;
   deleting: boolean;
   onToggleBot: (active: boolean) => Promise<void>;
   onDelete: () => Promise<void>;
+  onClose?: () => void;
 }) {
   return (
     <aside className="contact-column">
@@ -21,6 +23,9 @@ export function ContactPanel({
           <p className="eyebrow">FICHA</p>
           <h2>Contacto</h2>
         </div>
+        <button type="button" className="mobile-contact-close" onClick={onClose} aria-label="Volver al chat">
+          ×
+        </button>
       </div>
 
       {!conversation ? (
