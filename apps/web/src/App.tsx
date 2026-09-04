@@ -530,7 +530,6 @@ export default function App() {
           )}
         </div>
         <div className="topbar-user">
-          {testAccount && <span className="test-mode-label">Webhook de pruebas activo</span>}
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
           <button onClick={() => void logout()}>Salir</button>
         </div>
