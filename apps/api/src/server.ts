@@ -557,6 +557,9 @@ if (config.NODE_ENV === 'production' && fs.existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get('/', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
   app.get('/b/DSfRvuk-y5-A8', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+}
+// Dedicated INTEC entry point; keep it available regardless of NODE_ENV.
+if (fs.existsSync(webDist)) {
   app.get('/intec', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
 }
 
