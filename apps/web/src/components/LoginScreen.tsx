@@ -29,7 +29,6 @@ export function LoginScreen({
         <div className="brand-mark brand-mark--large">GC</div>
         <p className="eyebrow">GREEN CHIMP · INTERNO</p>
         <h1>Portal de conversaciones</h1>
-        <p className="login-copy">Atiende WhatsApp sin compartir las llaves del servidor con el navegador.</p>
 
         <form onSubmit={submit} className="login-form">
           <label>
