@@ -1,11 +1,18 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { Request, Response, NextFunction } from 'express';
+import type { QueryResultRow } from 'pg';
 import { config } from './config.js';
-import { query } from './db.js';
+import { pool } from './db.js';
 import type { PortalUser } from './types.js';
 
 const demoSessions = new Map<string, { user: PortalUser; expiresAt: number }>();
+
+async function authQuery<T extends QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
+  if (!pool) throw new Error('La base principal de autenticación no está disponible.');
+  const result = await pool.query<T>(text, values);
+  return result.rows;
+}
 
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
@@ -48,7 +55,7 @@ export async function validateCredentials(username: string, password: string): P
     if (!response.ok) return null;
     const auth = await response.json() as { user?: { id?: string; email?: string } };
     if (!auth.user?.id) return null;
-    const profile = await query<{
+    const profile = await authQuery<{
       id: string;
       usuario: string;
       email: string | null;
@@ -66,7 +73,7 @@ export async function validateCredentials(username: string, password: string): P
     return { id: row.id, username: row.usuario, name: row.nombre, email: row.email ?? auth.user.email ?? null, accountScope: row.account_scope };
   }
 
-  const rows = await query<{
+  const rows = await authQuery<{
     id: string;
     usuario: string;
     email: string | null;
@@ -95,7 +102,7 @@ export async function createSession(req: Request, res: Response, user: PortalUse
   if (config.DEMO_MODE) {
     demoSessions.set(token, { user, expiresAt: expiresAt.getTime() });
   } else {
-    await query(
+    await authQuery(
       `INSERT INTO public.portal_sesiones
         (usuario_id, token_hash, expira_en, user_agent, ip)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -116,7 +123,7 @@ export async function destroySession(req: Request, res: Response) {
   const token = parseCookies(req.headers.cookie)[config.COOKIE_NAME];
   if (token) {
     if (config.DEMO_MODE) demoSessions.delete(token);
-    else await query('DELETE FROM public.portal_sesiones WHERE token_hash = $1', [hashToken(token)]);
+    else await authQuery('DELETE FROM public.portal_sesiones WHERE token_hash = $1', [hashToken(token)]);
   }
   res.clearCookie(config.COOKIE_NAME, { path: '/' });
 }
@@ -143,7 +150,7 @@ export async function getSessionUser(req: Request): Promise<PortalUser | null> {
     return session.user;
   }
 
-  const rows = await query<{
+  const rows = await authQuery<{
     id: string;
     usuario: string;
     nombre: string;
@@ -163,7 +170,7 @@ export async function getSessionUser(req: Request): Promise<PortalUser | null> {
   const row = rows[0];
   if (!row) return null;
 
-  void query(
+  void authQuery(
     'UPDATE public.portal_sesiones SET ultimo_uso_en = NOW() WHERE token_hash = $1',
     [hashToken(token)]
   ).catch(() => undefined);
