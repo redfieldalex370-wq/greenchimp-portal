@@ -325,7 +325,6 @@ button { color: inherit; }
 
 @media (max-width: 1100px) {
   .account-switcher button { min-width: 0; }
-  .account-switcher button > span:last-child { display: none; }
   .account-switcher-dropdown__trigger { min-width: 0; }
   .account-switcher-dropdown__trigger > span:last-child { display: none; }
   .workspace { grid-template-columns: 300px minmax(420px, 1fr); }
