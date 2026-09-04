@@ -158,7 +158,8 @@ export function MessageThread({
   onSend,
   onSendMedia,
   onSendMediaById,
-  onError
+  onError,
+  onBack
 }: {
   conversation: Conversation | null;
   messages: Message[];
@@ -168,6 +169,7 @@ export function MessageThread({
   onSendMedia: (type: string, file: File, caption: string) => Promise<void>;
   onSendMediaById: (type: string, mediaId: string, caption: string) => Promise<void>;
   onError: (message: string) => void;
+  onBack?: () => void;
 }) {
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
@@ -365,7 +367,10 @@ export function MessageThread({
   return (
     <section className="thread-column">
       <header className="thread-header">
-        <div>
+        <button type="button" className="mobile-back-button" onClick={onBack} aria-label="Volver a conversaciones">
+          ‹
+        </button>
+        <div className="thread-header__identity">
           <h2>{conversation.nombre}</h2>
           <p>{conversation.wa_id}</p>
         </div>

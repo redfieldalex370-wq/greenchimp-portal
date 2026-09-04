@@ -208,7 +208,8 @@ export default function App() {
           return current;
         }
         const first = response.conversations[0];
-        return first ? conversationKey(first) : null;
+        const isMobile = window.matchMedia('(max-width: 760px)').matches;
+        return !isMobile && first ? conversationKey(first) : null;
       });
     } catch (error) {
       if (requestId !== conversationRequestRef.current || accountIdAtRequest !== activeAccountRef.current) return;
@@ -535,7 +536,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="workspace">
+      <main className={`workspace ${selected ? 'workspace--thread-open' : ''}`}>
         <ConversationList
           conversations={displayedConversations}
           selected={selected}
@@ -553,6 +554,7 @@ export default function App() {
           onSendMedia={sendMedia}
           onSendMediaById={sendMediaById}
           onError={showToast}
+          onBack={() => setSelectedKey(null)}
         />
         <ContactPanel
           conversation={selected}
