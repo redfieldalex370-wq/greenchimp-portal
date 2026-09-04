@@ -24,6 +24,8 @@ const schema = z.object({
   COOKIE_SECURE: booleanFromString,
   SESSION_DAYS: z.coerce.number().int().positive().default(30),
   AUTH_DISABLED: booleanFromString,
+  SUPABASE_URL: z.string().url().optional().or(z.literal('')),
+  SUPABASE_ANON_KEY: z.string().optional(),
   DEMO_MODE: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   DEMO_ADMIN_USER: z.string().default('admin'),
   DEMO_ADMIN_PASSWORD: z.string().default('cambia-esta-clave'),

@@ -5,8 +5,8 @@ export function LoginScreen({
 }: {
   onLogin: (username: string, password: string) => Promise<void>;
 }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('cambia-esta-clave');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,8 +33,8 @@ export function LoginScreen({
 
         <form onSubmit={submit} className="login-form">
           <label>
-            Usuario o correo
-            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
+            Correo electrónico
+            <input type="email" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required />
           </label>
           <label>
             Contraseña
@@ -51,7 +51,7 @@ export function LoginScreen({
           </button>
         </form>
 
-        <p className="demo-note">El repositorio inicia en modo demostración. Cambia las credenciales en <code>.env</code>.</p>
+        <p className="demo-note">El acceso y los permisos se administran desde Green Chimp.</p>
       </section>
     </main>
   );

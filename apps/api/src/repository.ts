@@ -88,17 +88,18 @@ export async function listConversations(search = '', phoneNumberId = ''): Promis
       .sort((a, b) => Date.parse(b.ultimo_mensaje) - Date.parse(a.ultimo_mensaje));
   }
 
-  const hasBandejaUsuarioId = pool ? await columnExists(pool, 'wa_bandeja', 'usuario_id') : false;
+  const selectedPool = activePool();
+  const hasBandejaUsuarioId = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'usuario_id') : false;
   const usuarioIdColumn = hasBandejaUsuarioId
     ? 'usuario_id::text AS usuario_id,'
     : 'NULL::text AS usuario_id,';
-  const hasBandejaVentanaAbierta = pool ? await columnExists(pool, 'wa_bandeja', 'ventana_abierta') : false;
-  const hasBandejaVentanaExpira = pool ? await columnExists(pool, 'wa_bandeja', 'ventana_expira') : false;
-  const hasBandejaTipoVentana = pool ? await columnExists(pool, 'wa_bandeja', 'tipo_ventana') : false;
-  const hasBandejaFuente = pool ? await columnExists(pool, 'wa_bandeja', 'fuente') : false;
-  const hasBandejaPausadoPor = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_por') : false;
-  const hasBandejaPausadoEn = pool ? await columnExists(pool, 'wa_bandeja', 'pausado_en') : false;
-  const hasBandejaArchivada = pool ? await columnExists(pool, 'wa_bandeja', 'archivada') : false;
+  const hasBandejaVentanaAbierta = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'ventana_abierta') : false;
+  const hasBandejaVentanaExpira = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'ventana_expira') : false;
+  const hasBandejaTipoVentana = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'tipo_ventana') : false;
+  const hasBandejaFuente = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'fuente') : false;
+  const hasBandejaPausadoPor = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'pausado_por') : false;
+  const hasBandejaPausadoEn = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'pausado_en') : false;
+  const hasBandejaArchivada = selectedPool ? await columnExists(selectedPool, 'wa_bandeja', 'archivada') : false;
   const ventanaAbiertaColumn = hasBandejaVentanaAbierta
     ? 'COALESCE(ventana_abierta, FALSE) AS ventana_abierta,'
     : 'FALSE AS ventana_abierta,';
@@ -403,7 +404,8 @@ export async function markRead(phoneNumberId: string, waId: string, usuarioId?: 
   }
 
   const usuarioIdTrimmed = usuarioId?.trim() || '';
-  const hasUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const operationPool = activePool();
+  const hasUsuarioId = operationPool ? await columnExists(operationPool, 'wa_conversaciones', 'usuario_id') : false;
 
   if (!hasUsuarioId) {
     await query(
@@ -573,7 +575,8 @@ export async function setBotActive(
     return;
   }
 
-  const hasUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const operationPool = activePool();
+  const hasUsuarioId = operationPool ? await columnExists(operationPool, 'wa_conversaciones', 'usuario_id') : false;
   if (!hasUsuarioId) {
     await query(
       `UPDATE public.wa_conversaciones
@@ -663,8 +666,9 @@ export async function addOutgoingTextMessage(input: {
 
   const generatedMessageId = input.messageId?.trim() || `wamid.portal.text.${Date.now()}`;
   const usuarioIdTrimmed = input.usuarioId?.trim() || '';
-  const hasMessageUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
-  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const operationPool = activePool();
+  const hasMessageUsuarioId = operationPool ? await columnExists(operationPool, 'wa_mensajes', 'usuario_id') : false;
+  const hasConversationUsuarioId = operationPool ? await columnExists(operationPool, 'wa_conversaciones', 'usuario_id') : false;
 
   const rows = hasMessageUsuarioId
     ? await query<Message>(
@@ -797,8 +801,9 @@ export async function addOutgoingMediaMessage(input: {
   }
 
   const usuarioIdTrimmed = input.usuarioId?.trim() || '';
-  const hasMessageUsuarioId = pool ? await columnExists(pool, 'wa_mensajes', 'usuario_id') : false;
-  const hasConversationUsuarioId = pool ? await columnExists(pool, 'wa_conversaciones', 'usuario_id') : false;
+  const operationPool = activePool();
+  const hasMessageUsuarioId = operationPool ? await columnExists(operationPool, 'wa_mensajes', 'usuario_id') : false;
+  const hasConversationUsuarioId = operationPool ? await columnExists(operationPool, 'wa_conversaciones', 'usuario_id') : false;
   const rows = hasMessageUsuarioId
     ? await query<Message>(
         `INSERT INTO public.wa_mensajes

@@ -35,6 +35,37 @@ export async function validateCredentials(username: string, password: string): P
     return { id: 'demo-1', username, name: 'Administrador Green Chimp', email: null, accountScope: null };
   }
 
+  if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
+    const response = await fetch(`${config.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        apikey: config.SUPABASE_ANON_KEY,
+        authorization: `Bearer ${config.SUPABASE_ANON_KEY}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ email: username, password })
+    });
+    if (!response.ok) return null;
+    const auth = await response.json() as { user?: { id?: string; email?: string } };
+    if (!auth.user?.id) return null;
+    const profile = await query<{
+      id: string;
+      usuario: string;
+      email: string | null;
+      nombre: string;
+      account_scope: string | null;
+    }>(
+      `SELECT id::text, usuario, email, nombre, account_scope
+         FROM public.portal_usuarios
+        WHERE id = $1 AND activo = TRUE
+        LIMIT 1`,
+      [auth.user.id]
+    );
+    const row = profile[0];
+    if (!row) return null;
+    return { id: row.id, username: row.usuario, name: row.nombre, email: row.email ?? auth.user.email ?? null, accountScope: row.account_scope };
+  }
+
   const rows = await query<{
     id: string;
     usuario: string;
@@ -91,7 +122,7 @@ export async function destroySession(req: Request, res: Response) {
 }
 
 export async function getSessionUser(req: Request): Promise<PortalUser | null> {
-  if (config.AUTH_DISABLED) {
+  if (config.AUTH_DISABLED && config.NODE_ENV !== 'production') {
     return {
       id: 'temporary-access',
       username: 'admin-temporal',

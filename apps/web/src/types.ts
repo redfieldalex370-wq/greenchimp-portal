@@ -3,6 +3,7 @@ export type PortalUser = {
   username: string;
   name: string;
   email: string | null;
+  accountScope?: string | null;
 };
 
 export type Conversation = {

@@ -86,12 +86,14 @@ export default function App() {
   }, [testBotConfig]);
 
   const portalAccounts = useMemo(
-    () => IS_INTEC_ROUTE
+    () => user?.accountScope
+      ? BASE_PORTAL_ACCOUNTS.filter((account) => account.id === user.accountScope)
+      : IS_INTEC_ROUTE
       ? BASE_PORTAL_ACCOUNTS.filter((account) => account.id === '1252826821253792')
       : IS_PUBLIC_TEST_ROUTE
       ? (testAccount ? [testAccount] : [])
       : [...BASE_PORTAL_ACCOUNTS, ...(testAccount ? [testAccount] : [])],
-    [testAccount]
+    [testAccount, user?.accountScope]
   );
 
   const isTestMode = Boolean(testAccount && activeAccountId === testAccount.id);
@@ -140,9 +142,11 @@ export default function App() {
 
   useEffect(() => {
     if (!portalAccounts.some((account) => account.id === activeAccountId)) {
-      setActiveAccountId(IS_PUBLIC_TEST_ROUTE ? (testAccount?.id ?? '') : BASE_PORTAL_ACCOUNTS[0].id);
+      setActiveAccountId(IS_PUBLIC_TEST_ROUTE
+        ? (testAccount?.id ?? '')
+        : (user?.accountScope || portalAccounts[0]?.id || BASE_PORTAL_ACCOUNTS[0].id));
     }
-  }, [activeAccountId, portalAccounts, testAccount]);
+  }, [activeAccountId, portalAccounts, testAccount, user?.accountScope]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);

@@ -196,7 +196,19 @@ app.get('/api/auth/me', async (req, res, next) => {
   }
 });
 
-app.get('/api/conversations', requireAuth, async (req, res, next) => {
+function requireConversationScope(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const scope = res.locals.user?.accountScope as string | null | undefined;
+  const phoneNumberId = typeof req.params.phoneNumberId === 'string'
+    ? req.params.phoneNumberId
+    : (typeof req.query.phone_number_id === 'string' ? req.query.phone_number_id : '');
+  if (scope && phoneNumberId && phoneNumberId !== scope) {
+    res.status(403).json({ ok: false, error: 'Esta cuenta no tiene acceso a esa conversación.' });
+    return;
+  }
+  next();
+}
+
+app.get('/api/conversations', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const search = typeof req.query.search === 'string' ? req.query.search : '';
     const scoped = res.locals.user?.accountScope as string | null | undefined;
@@ -208,7 +220,7 @@ app.get('/api/conversations', requireAuth, async (req, res, next) => {
   }
 });
 
-app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (req, res, next) => {
+app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const usuarioId = typeof req.query.usuario_id === 'string' ? req.query.usuario_id.trim() : '';
@@ -221,7 +233,7 @@ app.get('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (
   }
 });
 
-app.delete('/api/conversations/:phoneNumberId/:waId', requireAuth, async (req, res, next) => {
+app.delete('/api/conversations/:phoneNumberId/:waId', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({ usuario_id: z.string().trim().optional().nullable() }).parse(req.body ?? {});
@@ -293,7 +305,7 @@ app.get('/api/messages/:messageId/media', requireAuth, async (req, res, next) =>
   }
 });
 
-app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, async (req, res, next) => {
+app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({ usuario_id: z.string().trim().optional().nullable() }).parse(req.body ?? {});
@@ -304,7 +316,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/read', requireAuth, async (req
   }
 });
 
-app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, async (req, res, next) => {
+app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({ active: z.boolean(), usuario_id: z.string().trim().optional().nullable() }).parse(req.body);
@@ -318,7 +330,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/bot', requireAuth, async (req,
   }
 });
 
-app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async (req, res, next) => {
+app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({ text: z.string().trim().min(1).max(4096), usuario_id: z.string().trim().optional().nullable() }).parse(req.body);
@@ -363,7 +375,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages', requireAuth, async 
   }
 });
 
-app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, upload.single('file'), async (req, res, next) => {
+app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, requireConversationScope, upload.single('file'), async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({
@@ -434,7 +446,7 @@ app.post('/api/conversations/:phoneNumberId/:waId/messages/media', requireAuth, 
   }
 });
 
-app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAuth, async (req, res, next) => {
+app.post('/api/conversations/:phoneNumberId/:waId/messages/media-id', requireAuth, requireConversationScope, async (req, res, next) => {
   try {
     const params = conversationParamsSchema.parse(req.params);
     const input = z.object({
