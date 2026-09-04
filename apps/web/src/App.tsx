@@ -21,8 +21,20 @@ type TestBotConfig = {
 };
 
 const TEST_CHAT_PREFIX = 'portal-test-chat';
-const IS_PUBLIC_TEST_ROUTE = window.location.pathname === '/';
+const IS_LOGIN_ROUTE = window.location.pathname === '/';
+const IS_PUBLIC_TEST_ROUTE = false;
 const IS_INTEC_ROUTE = window.location.pathname === '/intec';
+
+function routeForUser(user: PortalUser) {
+  const routes: Record<string, string> = {
+    '620774694457849': '/dental',
+    '1272209879317604': '/zenda',
+    '1289334717595109': '/woolrich',
+    '1282163304983034': '/mundo-creativo',
+    '1252826821253792': '/intec'
+  };
+  return user.accountScope ? (routes[user.accountScope] || '/') : '/b/DSfRvuk-y5-A8';
+}
 
 function newTestChatId() {
   return `${TEST_CHAT_PREFIX}-${crypto.randomUUID()}`;
@@ -243,20 +255,12 @@ export default function App() {
   }, [showToast, isTestMode]);
 
   useEffect(() => {
-    if (IS_PUBLIC_TEST_ROUTE) {
-      setUser({ id: 'public-test', username: 'pruebas', name: 'Pruebas bot', email: null });
-      void api.testBotConfig()
-        .then((test) => {
-          if (test.enabled) {
-            setTestBotConfig({ label: test.label, displayNumber: test.displayNumber, phoneNumberId: test.phoneNumberId });
-            setActiveAccountId(test.phoneNumberId);
-          }
-        })
-        .finally(() => setBooting(false));
-      return;
-    }
     api.me()
       .then(async (response) => {
+        if (IS_LOGIN_ROUTE) {
+          window.location.replace(routeForUser(response.user));
+          return;
+        }
         setUser(response.user);
         try {
           const test = await api.testBotConfig();
@@ -312,14 +316,12 @@ export default function App() {
 
   async function login(username: string, password: string) {
     const response = await api.login(username, password);
-    setUser(response.user);
+    window.location.assign(routeForUser(response.user));
   }
 
   async function logout() {
     await api.logout();
-    setUser(null);
-    setConversations([]);
-    setMessages([]);
+    window.location.assign('/');
   }
 
   function selectAccount(phoneNumberId: string) {
@@ -530,7 +532,7 @@ export default function App() {
         <div className="topbar-user">
           {testAccount && <span className="test-mode-label">Webhook de pruebas activo</span>}
           <div><strong>{user.name}</strong><span>{user.username}</span></div>
-          {!IS_PUBLIC_TEST_ROUTE && <button onClick={() => void logout()}>Salir</button>}
+          <button onClick={() => void logout()}>Salir</button>
         </div>
       </header>
 
