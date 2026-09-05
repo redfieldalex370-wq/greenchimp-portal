@@ -342,13 +342,13 @@ button { color: inherit; }
   .topbar-brand span, .topbar-user > div { display: none; }
   .account-switcher { margin-left: auto; margin-right: 0; }
   .account-switcher-dropdown__menu { position: fixed; top: 64px; left: 10px; right: 10px; width: auto; min-width: 0; max-height: calc(100dvh - 78px); overflow-y: auto; }
-  .workspace { display: block; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; border: 0; }
-  .conversation-column, .thread-column { width: 100%; height: 100%; }
+  .workspace { position: relative; display: block; flex: 1 1 0; width: 100%; height: 0; min-height: 0; overflow: hidden; border: 0; }
+  .conversation-column, .thread-column { position: absolute; inset: 0; width: 100%; height: auto; min-height: 0; overflow: hidden; }
   .conversation-column { border-right: 0; border-bottom: 0; }
   .workspace:not(.workspace--thread-open) .thread-column { display: none; }
   .workspace.workspace--thread-open .conversation-column { display: none; }
   .workspace.workspace--thread-open.workspace--contact-open .thread-column { display: none; }
-  .workspace.workspace--thread-open.workspace--contact-open .contact-column { display: block; width: 100%; height: 100%; border: 0; padding: 0 16px max(20px, env(safe-area-inset-bottom)); }
+  .workspace.workspace--thread-open.workspace--contact-open .contact-column { position: absolute; inset: 0; display: block; width: 100%; height: auto; border: 0; padding: 0 16px max(20px, env(safe-area-inset-bottom)); }
   .thread-header { min-height: 64px; padding: 10px 12px; gap: 9px; }
   .mobile-back-button { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 12px; background: #18201b; color: var(--lime); font-size: 30px; line-height: 1; cursor: pointer; }
   .mobile-contact-button, .mobile-contact-close { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 12px; background: #18201b; color: var(--lime); font-size: 24px; line-height: 1; cursor: pointer; }
